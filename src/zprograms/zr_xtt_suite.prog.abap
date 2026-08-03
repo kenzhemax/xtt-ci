@@ -215,7 +215,9 @@ FORM test_050_tree.
       PERFORM assert_contains USING lv_squash `Total count: 9` `func=COUNT = 9`.
       PERFORM assert_contains USING lv_all `50` `func=AVG over SUM2 = 50`.
     CATCH cx_root INTO lx_error.
-      PERFORM assert USING abap_false |exception: { lx_error->get_text( ) }|.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
   ENDTRY.
 ENDFORM.
 
@@ -269,7 +271,9 @@ FORM test_021_formulas.
       PERFORM assert_contains USING lv_all `String 2` `block A rows written`.
       PERFORM assert_contains USING lv_all `<f` `formulas kept in sheet`.
     CATCH cx_root INTO lx_error.
-      PERFORM assert USING abap_false |exception: { lx_error->get_text( ) }|.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
   ENDTRY.
 ENDFORM.
 
@@ -311,7 +315,9 @@ FORM test_080_columns.
       PERFORM assert_contains USING lv_all `GRP C` `data written`.
       PERFORM assert_contains USING lv_all `I move to the end` `static cell preserved`.
     CATCH cx_root INTO lx_error.
-      PERFORM assert USING abap_false |exception: { lx_error->get_text( ) }|.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
   ENDTRY.
 ENDFORM.
 
@@ -352,7 +358,9 @@ FORM test_010_docx.
       PERFORM assert_contains USING lv_text `Document title` `{R-TITLE} replaced`.
       PERFORM assert_contains USING lv_text `әіңғүұқөһ` `unicode text written`.
     CATCH cx_root INTO lx_error.
-      PERFORM assert USING abap_false |exception: { lx_error->get_text( ) }|.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
   ENDTRY.
 ENDFORM.
 
@@ -398,6 +406,8 @@ FORM test_110_images.
       PERFORM zip_has USING lv_raw `xl/drawings/drawing*` CHANGING lv_found.
       PERFORM assert USING lv_found `drawing xml created`.
     CATCH cx_root INTO lx_error.
-      PERFORM assert USING abap_false |exception: { lx_error->get_text( ) }|.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
   ENDTRY.
 ENDFORM.

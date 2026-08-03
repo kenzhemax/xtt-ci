@@ -10,19 +10,18 @@ CLASS cl_abap_zip DEFINITION PUBLIC.
       RETURNING
         VALUE(val) TYPE xstring.
 
-    " local-abap patch: EXCEPTIONS added to match the SAP signature
     METHODS load
       IMPORTING
-        zip TYPE xstring
-      EXCEPTIONS
-        zip_parse_error.
+        zip TYPE xstring.
 
     METHODS get
       IMPORTING
         name    TYPE string OPTIONAL
         index   TYPE i OPTIONAL
       EXPORTING
-        content TYPE xstring.
+        content TYPE xstring
+      EXCEPTIONS
+        zip_index_error.
 
     METHODS delete
       IMPORTING
@@ -64,15 +63,19 @@ CLASS cl_abap_zip IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete.
-* local-abap patch: real implementation (by name; index unsupported)
-    IF name IS INITIAL.
-      RAISE zip_index_error.
-    ENDIF.
-    DELETE mt_contents WHERE name = name.
+    DATA lv_name TYPE string.
+
+    ASSERT name IS NOT INITIAL.
+    ASSERT index IS INITIAL.
+    lv_name = name.
+
+    READ TABLE mt_contents WITH KEY name = lv_name TRANSPORTING NO FIELDS.
     IF sy-subrc <> 0.
       RAISE zip_index_error.
     ENDIF.
-    DELETE files WHERE name = name.
+
+    DELETE mt_contents WHERE name = lv_name.
+    DELETE files WHERE name = lv_name.
   ENDMETHOD.
 
   METHOD get.
@@ -84,8 +87,6 @@ CLASS cl_abap_zip IMPLEMENTATION.
 
     READ TABLE mt_contents WITH KEY name = name INTO ls_contents.
     IF sy-subrc <> 0.
-      " SAP raises ZIP_INDEX_ERROR for a missing entry; callers rely on
-      " sy-subrc <> 0 (e.g. zcl_xtt_image=>save_in_archive 'already saved?')
       RAISE zip_index_error.
     ENDIF.
     cl_abap_gzip=>decompress_binary(
@@ -110,47 +111,90 @@ CLASS cl_abap_zip IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD load.
-* local-abap patch: real implementation via tools/zip-helper.mjs (node:zlib).
-* Entry contents are stored RAW-DEFLATE-compressed in MT_CONTENTS-COMPRESSED,
-* exactly like ADD produces (cl_abap_gzip=>compress_binary = deflateRawSync),
-* so GET and SAVE work unchanged on loaded archives.
-    DATA lv_count TYPE i.
-    DATA lv_index TYPE i.
-    DATA lv_name  TYPE string.
-    DATA lv_size  TYPE i.
-    DATA lv_comp  TYPE xstring.
-    DATA lv_data  TYPE xstring.
-    DATA ls_file     LIKE LINE OF files.
-    DATA ls_contents LIKE LINE OF mt_contents.
+* https://en.wikipedia.org/wiki/ZIP_(file_format)
+    CONSTANTS lc_local_sig TYPE x LENGTH 4 VALUE '504B0304'.
 
-    CLEAR: files, mt_contents.
+    DATA lv_offset     TYPE i.
+    DATA lv_length     TYPE i.
+    DATA lv_sig        TYPE x LENGTH 4.
+    DATA lv_comp_size  TYPE i.
+    DATA lv_comp_method TYPE i.
+    DATA lv_name_len   TYPE i.
+    DATA lv_extra_len  TYPE i.
+    DATA lv_name_x     TYPE xstring.
+    DATA lv_name_off   TYPE i.
+    DATA ls_contents   LIKE LINE OF mt_contents.
+    DATA ls_file       LIKE LINE OF files.
+    DATA lv_out_len    TYPE i.
+    DATA lo_conv       TYPE REF TO cl_abap_conv_in_ce.
 
-    WRITE '@KERNEL const helper = await import("../tools/zip-helper.mjs");'.
-    WRITE '@KERNEL const entries = helper.listEntries(zip.get());'.
-    WRITE '@KERNEL lv_count.set(entries === null ? -1 : entries.length);'.
-    IF lv_count < 0.
-      RAISE zip_parse_error.
-    ENDIF.
+    CLEAR mt_contents.
+    CLEAR files.
 
-    lv_index = 0.
-    WHILE lv_index < lv_count.
-      WRITE '@KERNEL lv_name.set(entries[lv_index.get()].name);'.
-      WRITE '@KERNEL lv_size.set(entries[lv_index.get()].size);'.
-      WRITE '@KERNEL lv_comp.set(entries[lv_index.get()].deflateHex);'.
-      WRITE '@KERNEL lv_data.set(entries[lv_index.get()].contentHex);'.
+    lv_length = xstrlen( zip ).
+    lv_offset = 0.
 
-      CLEAR ls_file.
-      ls_file-name = lv_name.
-      ls_file-size = lv_size.
-      APPEND ls_file TO files.
+    WHILE lv_offset + 30 <= lv_length.
+      lv_sig = zip+lv_offset(4).
+      IF lv_sig <> lc_local_sig.
+* end of local file records reached (central directory / EOCD)
+        EXIT.
+      ENDIF.
 
       CLEAR ls_contents.
-      ls_contents-name       = lv_name.
-      ls_contents-content    = lv_data.
-      ls_contents-compressed = lv_comp.
-      APPEND ls_contents TO mt_contents.
 
-      lv_index = lv_index + 1.
+* 8, 2, Compression method
+      lv_comp_method = lcl_stream=>read_int2( iv_xstr   = zip
+                                               iv_offset = lv_offset + 8 ).
+* 18, 4, Compressed size
+      lv_comp_size = lcl_stream=>read_int4( iv_xstr   = zip
+                                            iv_offset = lv_offset + 18 ).
+* 26, 2, File name length (n)
+      lv_name_len = lcl_stream=>read_int2( iv_xstr   = zip
+                                           iv_offset = lv_offset + 26 ).
+* 28, 2, Extra field length (m)
+      lv_extra_len = lcl_stream=>read_int2( iv_xstr   = zip
+                                            iv_offset = lv_offset + 28 ).
+
+* 30, n, File name
+      IF lv_name_len > 0.
+        lv_name_off = lv_offset + 30.
+        lv_name_x = zip+lv_name_off(lv_name_len).
+        lo_conv = cl_abap_conv_in_ce=>create( input = lv_name_x ).
+        lo_conv->read( IMPORTING data = ls_contents-name ).
+      ENDIF.
+
+      lv_offset = lv_offset + 30 + lv_name_len + lv_extra_len.
+
+* compressed data
+      IF lv_comp_size > 0.
+        ls_contents-compressed = zip+lv_offset(lv_comp_size).
+      ENDIF.
+      lv_offset = lv_offset + lv_comp_size.
+
+      IF lv_comp_method = 0.
+* STORED entry (no compression): the block is the content itself.
+* Recompress it so GET, which always inflates COMPRESSED, works unchanged.
+        ls_contents-content = ls_contents-compressed.
+        cl_abap_gzip=>compress_binary(
+          EXPORTING
+            raw_in   = ls_contents-content
+          IMPORTING
+            gzip_out = ls_contents-compressed ).
+      ELSE.
+        cl_abap_gzip=>decompress_binary(
+          EXPORTING
+            gzip_in     = ls_contents-compressed
+          IMPORTING
+            raw_out     = ls_contents-content
+            raw_out_len = lv_out_len ).
+      ENDIF.
+
+      INSERT ls_contents INTO TABLE mt_contents.
+
+      ls_file-name = ls_contents-name.
+      ls_file-size = xstrlen( ls_contents-content ).
+      INSERT ls_file INTO TABLE files.
     ENDWHILE.
   ENDMETHOD.
 
@@ -172,7 +216,7 @@ CLASS cl_abap_zip IMPLEMENTATION.
     lo_conv = cl_abap_conv_out_ce=>create( ).
 
     LOOP AT mt_contents INTO ls_contents.
-      lo_conv->convert( EXPORTING data = ls_contents-name
+      lo_conv->convert( EXPORTING data   = ls_contents-name
                         IMPORTING buffer = lv_buffer ).
 
 ****************************************
@@ -227,7 +271,8 @@ CLASS cl_abap_zip IMPLEMENTATION.
 * 28, 2, File name length (n)
 * 30, 2, Extra field length (m)
       lv_tmp = lo_file->get( ).
-      lo_central->append( lv_tmp+4(26) ).
+      lv_tmp = lv_tmp+4(26).
+      lo_central->append( lv_tmp ).
 
 * 32, 2, File comment length (k)
       lo_central->append_int2( 0 ).

@@ -12,12 +12,12 @@
   },
   "devDependencies": {
     "@abaplint/cli": "latest",
-    "@abaplint/core": "^2.120.2",
-    "@abaplint/transpiler": "^2.13.42",
+    "@abaplint/core": "^2.120.17",
+    "@abaplint/transpiler": "^2.13.48",
     "@abaplint/transpiler-cli": "latest"
   },
   "dependencies": {
     "@abaplint/database-sqlite": "^2.11.78",
-    "@abaplint/runtime": "^2.13.42"
+    "@abaplint/runtime": "^2.13.48"
   }
 }
