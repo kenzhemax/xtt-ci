@@ -1,0 +1,38 @@
+{
+  "global": {
+    "files": "/src/**/*.*"
+  },
+  "dependencies": [
+    {
+      "url": "https://github.com/open-abap/open-abap-core",
+      "folder": "/deps/open-abap-core",
+      "files": "/src/**/*.*"
+    },
+    {
+      "url": "https://github.com/open-abap/open-abap-bal",
+      "folder": "/deps/open-abap-bal",
+      "files": "/src/**/*.*"
+    },
+    {
+      "folder": "/compat/eui",
+      "files": "/src/*.*"
+    },
+    {
+      "url": "https://github.com/bizhuka/xtt",
+      "folder": "/deps/xtt",
+      "files": "/src/*.*"
+    }
+  ],
+  "syntax": {
+    "version": "v755",
+    "errorNamespace": "^(Z|Y|LCL\\_|TY\\_|LIF\\_)",
+    "globalConstants": [],
+    "globalMacros": []
+  },
+  "rules": {
+    "parser_error": true,
+    "unknown_types": true,
+    "check_syntax": true,
+    "downport": true
+  }
+}

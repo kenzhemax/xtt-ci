@@ -1,0 +1,23 @@
+{
+  "name": "xtt-ci",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CI harness: runs bizhuka/xtt on the abaplint transpiler stack, no SAP system required",
+  "scripts": {
+    "deps": "node tools/fetch-deps.mjs",
+    "build": "node tools/build.mjs",
+    "suite": "node --enable-source-maps tools/run.mjs zr_xtt_suite",
+    "ci": "npm run deps && npm run build && npm run suite"
+  },
+  "devDependencies": {
+    "@abaplint/cli": "latest",
+    "@abaplint/core": "^2.120.2",
+    "@abaplint/transpiler": "^2.13.42",
+    "@abaplint/transpiler-cli": "latest"
+  },
+  "dependencies": {
+    "@abaplint/database-sqlite": "^2.11.78",
+    "@abaplint/runtime": "^2.13.42"
+  }
+}

@@ -1,0 +1,33 @@
+name: xtt suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      xtt_repo:
+        description: "xtt repository to test (URL)"
+        default: "https://github.com/bizhuka/xtt"
+      xtt_ref:
+        description: "branch or tag of xtt to test"
+        default: ""
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run deps
+        env:
+          XTT_REPO: ${{ github.event.inputs.xtt_repo || 'https://github.com/bizhuka/xtt' }}
+          XTT_REF: ${{ github.event.inputs.xtt_ref || '' }}
+      - run: npm run build
+      - name: run xtt feature suite
+        run: |
+          npm run suite | tee suite.log
+          grep -q "ALL XTT SUITE TESTS PASSED" suite.log

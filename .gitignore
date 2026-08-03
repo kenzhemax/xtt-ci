@@ -1,0 +1,9 @@
+node_modules/
+output/
+build/
+data/
+deps/
+.downport/
+.buildcache.json
+.buildcache-libs.json
+*.log
