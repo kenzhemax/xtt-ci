@@ -128,6 +128,93 @@ FORM zip_part USING iv_raw  TYPE xstring
 ENDFORM.
 
 *&---------------------------------------------------------------------*
+*& Office rejects a document whose XML is not well formed. The cheapest
+*& killer is a duplicated attribute (<mergeCells count="8" count="28">),
+*& which every structural check happily accepts - so scan every tag of
+*& every part for repeated attribute names.
+*&---------------------------------------------------------------------*
+FORM assert_valid_office USING iv_raw TYPE xstring iv_msg TYPE string.
+  DATA lo_zip   TYPE REF TO cl_abap_zip.
+  DATA lv_hex   TYPE xstring.
+  DATA lv_text  TYPE string.
+  DATA lv_bad   TYPE string.
+  DATA lv_ok    TYPE abap_bool.
+  FIELD-SYMBOLS <ls_file> LIKE LINE OF lo_zip->files.
+
+  CREATE OBJECT lo_zip.
+  lo_zip->load( iv_raw ).
+
+  LOOP AT lo_zip->files ASSIGNING <ls_file>.
+    IF NOT ( <ls_file>-name CP '*.xml' OR <ls_file>-name CP '*.rels' ).
+      CONTINUE.
+    ENDIF.
+    CLEAR lv_hex.
+    lo_zip->get( EXPORTING name    = <ls_file>-name
+                 IMPORTING content = lv_hex
+                 EXCEPTIONS zip_index_error = 1 ).
+    CHECK sy-subrc = 0.
+    lv_text = zcl_eui_conv=>xstring_to_string( lv_hex ).
+    PERFORM find_dup_attribute USING lv_text CHANGING lv_bad.
+    IF lv_bad IS NOT INITIAL.
+      CONCATENATE <ls_file>-name `: ` lv_bad INTO lv_bad.
+      EXIT.
+    ENDIF.
+  ENDLOOP.
+
+  IF lv_bad IS INITIAL.
+    lv_ok = abap_true.
+  ELSE.
+    WRITE / |       { lv_bad }|.
+  ENDIF.
+  PERFORM assert USING lv_ok iv_msg.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& first tag containing the same attribute name twice, if any
+*&---------------------------------------------------------------------*
+FORM find_dup_attribute USING iv_xml TYPE string
+                        CHANGING cv_bad TYPE string.
+  DATA lt_tags  TYPE stringtab.
+  DATA lv_tag   TYPE string.
+  DATA lt_attr  TYPE stringtab.
+  DATA lt_seen  TYPE stringtab.
+  DATA lv_attr  TYPE string.
+  DATA lv_name  TYPE string.
+  DATA lt_words TYPE stringtab.
+  DATA lv_word  TYPE string.
+
+  CLEAR cv_bad.
+  SPLIT iv_xml AT '<' INTO TABLE lt_tags.
+
+  LOOP AT lt_tags INTO lv_tag.
+    CHECK lv_tag CS '='.
+    SPLIT lv_tag AT '>' INTO lv_tag lv_name.
+    CLEAR lt_seen.
+    SPLIT lv_tag AT '"' INTO TABLE lt_attr.
+    " odd entries hold ` name=`, even ones the quoted values
+    LOOP AT lt_attr INTO lv_attr.
+      CHECK sy-tabix MOD 2 = 1 AND lv_attr CS '='.
+      " the segment ends with the attribute name: `<tag foo="` / `" bar="`
+      CLEAR lv_name.
+      SPLIT lv_attr AT ` ` INTO TABLE lt_words.
+      LOOP AT lt_words INTO lv_word.
+        IF lv_word CS '='.
+          lv_name = lv_word.
+        ENDIF.
+      ENDLOOP.
+      REPLACE ALL OCCURRENCES OF `=` IN lv_name WITH ``.
+      CHECK lv_name IS NOT INITIAL.
+      READ TABLE lt_seen TRANSPORTING NO FIELDS WITH KEY table_line = lv_name.
+      IF sy-subrc = 0.
+        CONCATENATE `duplicate attribute "` lv_name `" in <` lv_tag `>` INTO cv_bad.
+        RETURN.
+      ENDIF.
+      APPEND lv_name TO lt_seen.
+    ENDLOOP.
+  ENDLOOP.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
 FORM assert USING iv_ok TYPE abap_bool iv_msg TYPE string.
   IF iv_ok = abap_true.
     WRITE / |  OK   { iv_msg }|.
@@ -214,6 +301,7 @@ FORM test_050_tree.
       REPLACE ALL OCCURRENCES OF REGEX ` +` IN lv_squash WITH ` `.
       PERFORM assert_contains USING lv_squash `Total count: 9` `func=COUNT = 9`.
       PERFORM assert_contains USING lv_all `50` `func=AVG over SUM2 = 50`.
+      PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.
@@ -270,6 +358,7 @@ FORM test_021_formulas.
       PERFORM assert_free     USING lv_all `{A-` `no {A-...} markers left`.
       PERFORM assert_contains USING lv_all `String 2` `block A rows written`.
       PERFORM assert_contains USING lv_all `<f` `formulas kept in sheet`.
+      PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.
@@ -314,6 +403,7 @@ FORM test_080_columns.
       PERFORM assert_free     USING lv_all `{R-` `no {R-...} markers left`.
       PERFORM assert_contains USING lv_all `GRP C` `data written`.
       PERFORM assert_contains USING lv_all `I move to the end` `static cell preserved`.
+      PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.
@@ -357,6 +447,7 @@ FORM test_010_docx.
       PERFORM assert_free     USING lv_text `{R-` `no {R-...} markers left (runs merged)`.
       PERFORM assert_contains USING lv_text `Document title` `{R-TITLE} replaced`.
       PERFORM assert_contains USING lv_text `әіңғүұқөһ` `unicode text written`.
+      PERFORM assert_valid_office USING lv_raw `valid docx (no duplicate attributes)`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.
@@ -405,6 +496,7 @@ FORM test_110_images.
       PERFORM assert USING lv_found `images embedded in xl/media/`.
       PERFORM zip_has USING lv_raw `xl/drawings/drawing*` CHANGING lv_found.
       PERFORM assert USING lv_found `drawing xml created`.
+      PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.

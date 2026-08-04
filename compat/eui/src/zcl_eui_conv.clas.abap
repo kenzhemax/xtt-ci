@@ -137,6 +137,12 @@ CLASS zcl_eui_conv IMPLEMENTATION.
                                             document = io_doc ).
     li_renderer->render( ).
 
+    " The string renderer emits an utf-16 prolog (SAP does the same for
+    " string ostreams), but we serialize the result as UTF-8 bytes.
+    " A wrong prolog makes strict readers (Excel, Word) reject the file.
+    REPLACE FIRST OCCURRENCE OF `encoding="utf-16"` IN lv_str
+      WITH `encoding="UTF-8"`.
+
     IF ev_str IS REQUESTED.
       ev_str = lv_str.
     ENDIF.
