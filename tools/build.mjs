@@ -57,34 +57,20 @@ applyDepsPatches();
 // Anchored fixups: tiny targeted edits to deps sources. Unlike the file
 // overlay above these FAIL LOUDLY when upstream changes the code around the
 // anchor - an upstream update can never be silently reverted.
+//
+// Two former fixups are gone because upstream removed the SAP-only code itself
+// (bizhuka/xtt a4006a8 "Use ZIF_EUI_OLE"): the dynamic PERFORM IN PROGRAM
+// ('Z_XTT_DEBUG') debug hook is commented out at the source, and the raw
+// `CALL METHOD OF cv_ole_doc 'SaveAs'` tail became `eo_ole->save_as( )` through
+// zif_eui_ole - an ordinary method call that transpiles fine and is skipped at
+// runtime because compat/eui's open_by_ole returns an unbound reference.
 const FIXUPS = [
-  {
-    file: "deps/xtt/src/zcl_xtt.clas.abap",
-    reason: "dynamic PERFORM IN PROGRAM (Z_XTT_DEBUG) is SAP-only",
-    find: `  DATA lv_debug TYPE abap_bool VALUE abap_false.`,
-    replace: `  RETURN. " xtt-ci fixup: dynamic debug hook is SAP-only
-  DATA lv_debug TYPE abap_bool VALUE abap_false.`,
-  },
   {
     file: "deps/xtt/src/zcl_xtt_xml_base.clas.abap",
     reason: "BAL pushbutton wiring is SAP GUI only",
     find: `  CHECK lv_chars_skipped_within_block = abap_true.`,
     replace: `  CHECK lv_chars_skipped_within_block = abap_true.
   RETURN. " xtt-ci fixup: BAL pushbutton is SAP GUI only`,
-  },
-  {
-    file: "deps/xtt/src/zcl_xtt_xml_base.clas.abap",
-    reason: "OLE statements cannot be transpiled",
-    find: `  CALL METHOD OF cv_ole_doc 'SaveAs'
-    EXPORTING
-      #1 = cv_fullpath
-      #2 = mv_ole_ext_format.
-
-  IF lv_open = mc_by-ole_hide.
-    CALL METHOD OF cv_ole_app 'QUIT'.
-    FREE OBJECT: cv_ole_doc, cv_ole_app.
-  ENDIF.`,
-    replace: `  " xtt-ci fixup: OLE SaveAs/QUIT removed (SAP GUI only, not transpilable)`,
   },
 ];
 for (const f of FIXUPS) {
@@ -183,16 +169,11 @@ const downportConfig = {
       folder: "/../deps/open-abap-core",
       files: "/src/**/*.*",
     },
-    
     {
       url: "https://github.com/open-abap/open-abap-bal",
       folder: "/../deps/open-abap-bal",
       files: "/src/**/*.*",
     },
-    
-    
-    
-    
     {
       folder: "/../compat/eui",
       files: "/src/*.*",
@@ -242,7 +223,11 @@ function libFingerprint(dir) {
 // block (ABAP semantics is method scope) -> ReferenceError when used after
 // the block. Hoisting single-line declarations to the top of the method is
 // semantically neutral in ABAP and sidesteps the bug for ported libs.
-const HOIST_VERSION = "hoist-v4"; // TYPE only (LIKE is order-dependent); v3: single-line DATA: chains; v4: only from nested blocks (method-top DATA may follow local TYPES)
+// NO_HOIST=1 disables the workaround, to re-check whether the transpiler bug is
+// fixed upstream (as of @abaplint/transpiler 2.13.52 it is not: the suite dies
+// with "ReferenceError: l_x_value is not defined" in zcl_xtt_excel_xlsx).
+const HOIST = process.env.NO_HOIST !== "1";
+const HOIST_VERSION = HOIST ? "hoist-v4" : "hoist-off"; // TYPE only (LIKE is order-dependent); v3: single-line DATA: chains; v4: only from nested blocks (method-top DATA may follow local TYPES)
 function hoistDataDeclarations(dir) {
   const OPEN  = /^(IF|LOOP|DO|WHILE|TRY|CASE)\b|^DO\.$/;
   const CLOSE = /^(ENDIF|ENDLOOP|ENDDO|ENDWHILE|ENDTRY|ENDCASE)\b/;
@@ -314,7 +299,7 @@ for (const lib of DOWNPORT_LIBS) {
     (d) => !(d.folder ?? "").endsWith(`/deps/${lib.name}`));
   writeFileSync(join(outDir, "abaplint.json"), JSON.stringify(libConfig, null, 2));
   execSync("npx abaplint abaplint.json --fix", { cwd: outDir, stdio: "inherit" });
-  hoistDataDeclarations(join(outDir, "src"));
+  if (HOIST) hoistDataDeclarations(join(outDir, "src"));
   libState[lib.name] = print;
 }
 writeFileSync(".buildcache-libs.json", JSON.stringify(libState, null, 1));

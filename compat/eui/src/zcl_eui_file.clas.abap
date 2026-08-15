@@ -40,9 +40,8 @@ CLASS zcl_eui_file DEFINITION PUBLIC CREATE PUBLIC.
       RAISING zcx_eui_exception.
 
     METHODS open_by_ole
-      IMPORTING iv_visible TYPE abap_bool DEFAULT abap_true
-      CHANGING  cv_ole_app TYPE any OPTIONAL
-                cv_ole_doc TYPE any OPTIONAL
+      IMPORTING iv_visible     TYPE abap_bool DEFAULT abap_true
+      RETURNING VALUE(ro_ole)  TYPE REF TO zif_eui_ole
       RAISING   zcx_eui_exception.
 
     METHODS show
@@ -101,7 +100,7 @@ CLASS zcl_eui_file IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD open_by_ole.
-    " no OLE without SAP GUI - intentionally a no-op
+    " no OLE without SAP GUI: the unbound ro_ole makes xtt skip the SaveAs tail
     RETURN.
   ENDMETHOD.
 

@@ -31,14 +31,15 @@ exposes the same via workflow_dispatch inputs).
 - `tools/build.mjs` downports modern ABAP to 7.02 (abaplint `--fix`), applies
   the patch overlay from `tools/patches/` (open-abap-core gaps that are being
   upstreamed + a few compat DDIC elements), hoists block-local `DATA` declarations
-  (transpiler scoping workaround), then transpiles everything to JavaScript.
-  The three SAP-GUI-only spots in xtt (OLE download tail, dynamic debug hook,
-  BAL pushbutton) are neutralized by ANCHORED FIXUPS in build.mjs: if upstream
-  xtt changes that code, the build fails with a clear message instead of
-  silently reverting the author's changes
+  (transpiler scoping workaround - `NO_HOIST=1` re-checks whether the
+  transpiler bug is fixed), then transpiles everything to JavaScript.
+  The one remaining SAP-GUI-only spot in xtt (the BAL pushbutton) is neutralized
+  by an ANCHORED FIXUP in build.mjs: if upstream xtt changes that code, the
+  build fails with a clear message instead of silently reverting the author's
+  changes
 - `compat/eui/` is a minimal reimplementation of the
   [bizhuka/eui](https://github.com/bizhuka/eui) surface xtt needs
-  (`zcl_eui_conv`, `zcl_eui_file`, logger, exceptions)
+  (`zcl_eui_conv`, `zcl_eui_file`, `zif_eui_ole`, logger, exceptions)
 - `src/zprograms/zr_xtt_suite.prog.abap` is plain ABAP — the same code would
   run on a real SAP system
 - `tools/run.mjs` executes it on Node.js with an in-memory SQLite database
