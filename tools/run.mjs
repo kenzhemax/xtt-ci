@@ -1,15 +1,14 @@
 // Local ABAP runner — executes a transpiled Z-program by name.
-//   npm start -- zr_hello        run a specific program
-//   npm run abap                 no argument -> interactive picker
+//   node tools/run.mjs zr_xtt_suite   run a specific program (= npm run suite)
+//   node tools/run.mjs                no argument -> interactive picker
 //
 // The transpiled module (output/<name>.prog.mjs) self-initializes the ABAP
 // runtime on import and runs its top-level code (START-OF-SELECTION etc.).
 // WRITE output goes straight to stdout via the runtime's StandardOutConsole.
 
 import { pathToFileURL } from "node:url";
-import { existsSync, statSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { spawn } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 
 function catalog() {
@@ -53,7 +52,6 @@ if (!existsSync(file)) {
 }
 
 console.log(`\n=== Running ${name} (local ABAP, no SAP) ===\n`);
-const startedAt = Date.now();
 try {
   // initialize via the SEQUENTIAL init script: the static-import variant
   // (_init.mjs) evaluates async sibling modules concurrently, so class
@@ -64,22 +62,6 @@ try {
   const { saveDatabase } = await import("./db-setup.mjs");
   if (saveDatabase()) {
     console.log(`\n\n[run] database saved to data/local.sqlite`);
-  }
-
-  // did this program produce ALV output? then serve it in an app window
-  const alvFile = resolve("data", "alv.json");
-  if (existsSync(alvFile) && statSync(alvFile).mtimeMs >= startedAt) {
-    const port = process.env.ALV_PORT ?? "3456";
-    spawn(process.execPath, [resolve("tools", "alv-server.mjs")], {
-      detached: true, stdio: "ignore",
-    }).unref();
-    await new Promise((r) => setTimeout(r, 500));
-    if (process.env.ALV_NO_WINDOW !== "1") {
-      spawn("cmd", ["/c", "start", "", "msedge", `--app=http://localhost:${port}/alv`], {
-        detached: true, stdio: "ignore",
-      }).unref();
-    }
-    console.log(`[run] ALV grid: http://localhost:${port}/alv (app window opened)`);
   }
 
   console.log(`\n=== ${name} finished ===\n`);
