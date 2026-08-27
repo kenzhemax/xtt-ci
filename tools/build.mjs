@@ -223,8 +223,12 @@ function libFingerprint(dir) {
 // fixed upstream (as of @abaplint/transpiler 2.13.52 it is not: the suite dies
 // with "ReferenceError: l_x_value is not defined" in zcl_xtt_excel_xlsx).
 const HOIST = process.env.NO_HOIST !== "1";
-const HOIST_VERSION = HOIST ? "hoist-v4" : "hoist-off"; // TYPE only (LIKE is order-dependent); v3: single-line DATA: chains; v4: only from nested blocks (method-top DATA may follow local TYPES)
-function hoistDataDeclarations(dir) {
+const HOIST_VERSION = HOIST ? "hoist-v5" : "hoist-off"; // TYPE only (LIKE is order-dependent); v3: single-line DATA: chains; v4: only from nested blocks (method-top DATA may follow local TYPES); v5: FIELD-SYMBOLS too
+// FIELD-SYMBOLS are method-scoped in ABAP exactly like DATA and hit the same
+// transpiler bug: zcl_xtt_excel_xml~on_match_found declares <lv_date> inside
+// one CASE branch and reads it in another (and after the CASE), which becomes
+// "ReferenceError: fs_lv_date_ is not defined".
+function hoistDeclarations(dir) {
   const OPEN  = /^(IF|LOOP|DO|WHILE|TRY|CASE)\b|^DO\.$/;
   const CLOSE = /^(ENDIF|ENDLOOP|ENDDO|ENDWHILE|ENDTRY|ENDCASE)\b/;
   for (const f of listFiles(dir)) {
@@ -250,9 +254,11 @@ function hoistDataDeclarations(dir) {
       }
       const isPlainData = /^\s*DATA\s+\w+\s+TYPE\s+.*\.\s*(".*)?$/i.test(line);
       const isChainData = /^\s*DATA:\s*\w+\s+TYPE\s+[^,.]+(\s*,\s*\w+\s+TYPE\s+[^,.]+)*\s*\.\s*(".*)?$/i.test(line);
+      const isPlainFs = /^\s*FIELD-SYMBOLS\s+<\w+>\s+TYPE\s+.*\.\s*(".*)?$/i.test(line);
+      const isChainFs = /^\s*FIELD-SYMBOLS:\s*<\w+>\s+TYPE\s+[^,.]+(\s*,\s*<\w+>\s+TYPE\s+[^,.]+)*\s*\.\s*(".*)?$/i.test(line);
       // only hoist out of nested blocks; top-level DATA stays in place so it
       // can follow method-local TYPES declarations (e.g. zcl_xtt_image)
-      if (methodStart >= 0 && depth > 0 && (isPlainData || isChainData)) {
+      if (methodStart >= 0 && depth > 0 && (isPlainData || isChainData || isPlainFs || isChainFs)) {
         out.splice(methodStart + hoisted, 0, line);
         hoisted++;
         continue;
@@ -295,7 +301,7 @@ for (const lib of DOWNPORT_LIBS) {
     (d) => !(d.folder ?? "").endsWith(`/deps/${lib.name}`));
   writeFileSync(join(outDir, "abaplint.json"), JSON.stringify(libConfig, null, 2));
   execSync("npx abaplint abaplint.json --fix", { cwd: outDir, stdio: "inherit" });
-  if (HOIST) hoistDataDeclarations(join(outDir, "src"));
+  if (HOIST) hoistDeclarations(join(outDir, "src"));
   libState[lib.name] = print;
 }
 writeFileSync(".buildcache-libs.json", JSON.stringify(libState, null, 1));
