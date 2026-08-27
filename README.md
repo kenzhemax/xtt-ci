@@ -33,10 +33,10 @@ exposes the same via workflow_dispatch inputs).
   upstreamed + a few compat DDIC elements), hoists block-local `DATA` declarations
   (transpiler scoping workaround - `NO_HOIST=1` re-checks whether the
   transpiler bug is fixed), then transpiles everything to JavaScript.
-  The one remaining SAP-GUI-only spot in xtt (the BAL pushbutton) is neutralized
-  by an ANCHORED FIXUP in build.mjs: if upstream xtt changes that code, the
-  build fails with a clear message instead of silently reverting the author's
-  changes
+  The ANCHORED FIXUPS list in build.mjs is currently EMPTY - upstream now
+  guards every SAP-GUI-only spot itself. The machinery stays because it fails
+  loudly when an anchor moves, so an upstream update can never be silently
+  reverted
 - `compat/eui/` is a minimal reimplementation of the
   [bizhuka/eui](https://github.com/bizhuka/eui) surface xtt needs
   (`zcl_eui_conv`, `zcl_eui_file`, `zif_eui_ole`, logger, exceptions)

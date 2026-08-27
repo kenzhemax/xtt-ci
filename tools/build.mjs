@@ -58,21 +58,17 @@ applyDepsPatches();
 // overlay above these FAIL LOUDLY when upstream changes the code around the
 // anchor - an upstream update can never be silently reverted.
 //
-// Two former fixups are gone because upstream removed the SAP-only code itself
-// (bizhuka/xtt a4006a8 "Use ZIF_EUI_OLE"): the dynamic PERFORM IN PROGRAM
-// ('Z_XTT_DEBUG') debug hook is commented out at the source, and the raw
-// `CALL METHOD OF cv_ole_doc 'SaveAs'` tail became `eo_ole->save_as( )` through
-// zif_eui_ole - an ordinary method call that transpiles fine and is skipped at
-// runtime because compat/eui's open_by_ole returns an unbound reference.
-const FIXUPS = [
-  {
-    file: "deps/xtt/src/zcl_xtt_xml_base.clas.abap",
-    reason: "BAL pushbutton wiring is SAP GUI only",
-    find: `  CHECK lv_chars_skipped_within_block = abap_true.`,
-    replace: `  CHECK lv_chars_skipped_within_block = abap_true.
-  RETURN. " xtt-ci fixup: BAL pushbutton is SAP GUI only`,
-  },
-];
+// Currently EMPTY - upstream now guards every SAP-GUI-only spot itself:
+//   - a4006a8 "Use ZIF_EUI_OLE": the PERFORM IN PROGRAM ('Z_XTT_DEBUG') debug
+//     hook is commented out at the source, and the raw
+//     `CALL METHOD OF cv_ole_doc 'SaveAs'` tail became `eo_ole->save_as( )` -
+//     an ordinary method call, skipped here because compat/eui's open_by_ole
+//     returns an unbound reference.
+//   - 097cc7b "adapt for Open ABAP": the BAL pushbutton block now sits behind
+//     `AND zcl_eui_menu=>can_show( ) = abap_true`, and compat/eui's can_show
+//     returns abap_false.
+// The machinery stays for the next SAP-only statement upstream introduces.
+const FIXUPS = [];
 for (const f of FIXUPS) {
   const src = readFileSync(f.file, "utf8").replace(/\r\n/g, "\n");
   if (src.includes(f.replace)) continue; // already applied
