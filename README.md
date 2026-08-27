@@ -15,10 +15,18 @@ author's own demo templates (`src/demo/*.w3mi.data.*`):
 | 010  | HTML: same root, plain-text output (`zcl_xtt_html`) |
 | 020  | SpreadsheetML: `PageSetup` header/footer, `ss:Type` cell typing (`zcl_xtt_excel_xml`) |
 | 020  | WordprocessingML: numeric/date field merge (`zcl_xtt_word_xml`) |
+| 022  | DOCX cell merging `;merge=G0` (asserted on `<w:vMerge>`) |
+| 030  | two root blocks — `{DOC-…}` and `{R-…}` — merged into one document |
+| 060  | relation tree `{R-T;group=DIR-PAR_DIR}` + the static `PREPARE_TREE` event |
 
-One template per test — 8 of the 64 templates in `deps/xtt/src/demo/`. The last
-three exist because `zcl_xtt_html`, `zcl_xtt_excel_xml` and `zcl_xtt_word_xml`
-were being transpiled on every build but never executed.
+One template per test — 11 of the 64 templates in `deps/xtt/src/demo/`.
+
+The demo *programs* are deliberately not built. They are not 30 test programs
+but one GUI application: `z_xtt_demo` is a single `REPORT` assembled from 26
+`INCLUDE`s of **local** `lcl_demo_*` classes (no public class anywhere), it
+resolves templates through `zcl_xtt_file_smw0` (`SELECT` from `WWWDATA`), and
+it is driven by a selection screen with F4. The reusable half is
+`set_merge_info`, which this suite ports by hand.
 
 ## Run locally
 
@@ -57,6 +65,20 @@ exposes the same via workflow_dispatch inputs).
 transpiled environment.
 
 ## Known gaps
+
+Trees in DOCX do not run. `lcl_tree_handler` reaches the private
+`zcl_xtt_xml_base~do_merge` through `LOCAL FRIENDS`, which the transpiler
+implements as a flat `FRIENDS_ACCESS_INSTANCE` map that is **not** searched up
+the inheritance chain: on a `zcl_xtt_word_docx` instance the map holds only
+`SUPER` plus the subclass's own members, so the call dies with
+`FRIENDS_ACCESS_INSTANCE.do_merge is not a function`. Trees in XLSX are fine —
+`zcl_xtt_excel_xlsx` has its own handler. This is why demo 022 is covered with
+`022_g0-docx` (cell merging) instead of `022_g0_tree-docx`.
+
+Merging a root block passed as a **table** of roots — the template clones one
+sheet per entry — crashes in `_workbook_write_xml`. Demo 030 is therefore
+covered with a single `R` root, which still exercises the two-root
+(`{DOC-…}` + `{R-…}`) merge.
 
 `;type=datetime` in SpreadsheetML renders as garbage.
 `zcl_xtt_excel_xml~on_match_found` splits a `char14` with
