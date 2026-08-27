@@ -6,6 +6,9 @@ REPORT zr_xtt_suite.
 "   021 - formulas (shared/array) + second block {A-INFO}
 "   080 - ;direction=column + code-side tree_create (REF TO data)
 "   010 - DOCX: markers broken across <w:r> runs, unicode
+"   010 - HTML: same root, plain-text output (zcl_xtt_html)
+"   020 - SpreadsheetML: header/footer + ;type=datetime (zcl_xtt_excel_xml)
+"   020 - WordprocessingML: ;type=mask sums (zcl_xtt_word_xml)
 " Data is deterministic so aggregates can be asserted exactly.
 
 TYPES: BEGIN OF ty_rand_row,
@@ -44,7 +47,19 @@ TYPES: BEGIN OF ty_rand_row,
        BEGIN OF ty_icon_root,
          title TYPE string,
          t     TYPE ty_icon_rows,
-       END OF ty_icon_root.
+       END OF ty_icon_root,
+       BEGIN OF ty_xml_root,
+         header   TYPE string,
+         footer   TYPE string,
+         datetime TYPE c LENGTH 14,
+         t        TYPE ty_rand_rows,
+       END OF ty_xml_root,
+       BEGIN OF ty_wxml_root,
+         title TYPE string,
+         date  TYPE d,
+         time  TYPE t,
+         t     TYPE ty_rand_rows,
+       END OF ty_wxml_root.
 
 DATA gv_failed TYPE i.
 
@@ -54,6 +69,9 @@ START-OF-SELECTION.
   PERFORM test_080_columns.
   PERFORM test_010_docx.
   PERFORM test_110_images.
+  PERFORM test_010_html.
+  PERFORM test_020_excel_xml.
+  PERFORM test_020_word_xml.
 
   IF gv_failed = 0.
     WRITE / 'ALL XTT SUITE TESTS PASSED'.
@@ -497,6 +515,161 @@ FORM test_110_images.
       PERFORM zip_has USING lv_raw `xl/drawings/drawing*` CHANGING lv_found.
       PERFORM assert USING lv_found `drawing xml created`.
       PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
+    CATCH cx_root INTO lx_error.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
+  ENDTRY.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& raw (non-zip) output as text
+*&---------------------------------------------------------------------*
+FORM raw_to_text USING iv_raw TYPE xstring
+                 CHANGING cv_text TYPE string.
+  cv_text = zcl_eui_conv=>xstring_to_string( iv_raw ).
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 010 html - zcl_xtt_html, same root as the docx test, plain-text output
+*&---------------------------------------------------------------------*
+FORM test_010_html.
+  DATA ls_root  TYPE ty_docx_root.
+  DATA lo_file  TYPE REF TO zif_xtt_file.
+  DATA lo_xtt   TYPE REF TO zcl_xtt_html.
+  DATA lv_raw   TYPE xstring.
+  DATA lv_text  TYPE string.
+  DATA lx_error TYPE REF TO cx_root.
+
+  WRITE / '--- 010 html ---'.
+  TRY.
+      ls_root-title  = 'Document title'.
+      ls_root-text   = 'Just string әіңғүұқөһ ӘІҢҒҮҰҚӨ'.
+      ls_root-int    = 3.
+      ls_root-bottom = 'bottom'.
+
+      CREATE OBJECT lo_file TYPE zcl_xtt_file_raw
+        EXPORTING
+          iv_name    = `xtt_suite_010.html`
+          iv_xstring = zcl_js_fs=>read_file_x( `deps/xtt/src/demo/zxxt_demo_010-html.w3mi.data.html` ).
+      CREATE OBJECT lo_xtt
+        EXPORTING
+          io_file = lo_file.
+      lo_xtt->merge( iv_block_name = 'R'
+                     is_block      = ls_root ).
+      lv_raw = lo_xtt->get_raw( ).
+      zcl_js_fs=>write_file_x( iv_path = `data/xtt_suite_010.html`
+                               iv_data = lv_raw ).
+
+      PERFORM raw_to_text USING lv_raw CHANGING lv_text.
+
+      PERFORM assert_free     USING lv_text `{R-` `no {R-...} markers left`.
+      PERFORM assert_contains USING lv_text `Document title` `{R-TITLE} replaced`.
+      PERFORM assert_contains USING lv_text `әіңғүұқөһ` `unicode text written`.
+      PERFORM assert_contains USING lv_text `bottom` `{R-BOTTOM} replaced`.
+      PERFORM assert_contains USING lv_text `</html>` `html document still well formed`.
+    CATCH cx_root INTO lx_error.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
+  ENDTRY.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 020 excel-xml - zcl_xtt_excel_xml (SpreadsheetML), header/footer +
+*& ;type=datetime in the page setup, table rows in the sheet
+*&---------------------------------------------------------------------*
+FORM test_020_excel_xml.
+  DATA ls_root  TYPE ty_xml_root.
+  DATA lo_file  TYPE REF TO zif_xtt_file.
+  DATA lo_xtt   TYPE REF TO zcl_xtt_excel_xml.
+  DATA lv_raw   TYPE xstring.
+  DATA lv_text  TYPE string.
+  DATA lx_error TYPE REF TO cx_root.
+
+  WRITE / '--- 020 excel-xml (SpreadsheetML) ---'.
+  TRY.
+      ls_root-header   = 'Suite header'.
+      ls_root-footer   = 'Suite footer'.
+      ls_root-datetime = '20260101120000'.
+      PERFORM fill_rand_table CHANGING ls_root-t.
+
+      CREATE OBJECT lo_file TYPE zcl_xtt_file_raw
+        EXPORTING
+          iv_name    = `xtt_suite_020_excel.xml`
+          iv_xstring = zcl_js_fs=>read_file_x( `deps/xtt/src/demo/zxxt_demo_020_excel-xml.w3mi.data.xml` ).
+      CREATE OBJECT lo_xtt
+        EXPORTING
+          io_file = lo_file.
+      lo_xtt->merge( iv_block_name = 'R'
+                     is_block      = ls_root ).
+      lv_raw = lo_xtt->get_raw( ).
+      zcl_js_fs=>write_file_x( iv_path = `data/xtt_suite_020_excel.xml`
+                               iv_data = lv_raw ).
+
+      PERFORM raw_to_text USING lv_raw CHANGING lv_text.
+
+      PERFORM assert_free     USING lv_text `{R-` `no {R-...} markers left`.
+      PERFORM assert_contains USING lv_text `Suite header` `{R-HEADER} replaced in PageSetup`.
+      PERFORM assert_contains USING lv_text `Suite footer` `{R-FOOTER} replaced in PageSetup`.
+      PERFORM assert_contains USING lv_text `GRP B` `table rows written`.
+      PERFORM assert_contains USING lv_text `&lt;Caption 1 /&gt;` `xml symbols escaped`.
+      PERFORM assert_contains USING lv_text `ss:Type="Number">300<` `numeric cell typed as Number`.
+      PERFORM assert_contains USING lv_text `ss:Type="DateTime">2026-01-05T` `date cell typed as DateTime`.
+      PERFORM assert_contains USING lv_text `</Workbook>` `SpreadsheetML still well formed`.
+      " NOTE: {R-DATETIME;type=datetime} in the PageSetup footer is deliberately
+      " NOT asserted - it renders as garbage here. zcl_xtt_excel_xml~on_match_found
+      " splits a char14 via ASSIGN <lv_string>(8) TO <lv_date> CASTING, and the
+      " transpiler does not reinterpret the bytes, so lv_date/lv_time come out as
+      " junk. Valid ABAP, transpiler gap - see "Known gaps" in the README. The
+      " typed ss:Type="DateTime" column above is the path that does work.
+    CATCH cx_root INTO lx_error.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
+  ENDTRY.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 020 word-xml - zcl_xtt_word_xml (WordprocessingML), ;type=mask sums
+*&---------------------------------------------------------------------*
+FORM test_020_word_xml.
+  DATA ls_root  TYPE ty_wxml_root.
+  DATA lo_file  TYPE REF TO zif_xtt_file.
+  DATA lo_xtt   TYPE REF TO zcl_xtt_word_xml.
+  DATA lv_raw   TYPE xstring.
+  DATA lv_text  TYPE string.
+  DATA lx_error TYPE REF TO cx_root.
+
+  WRITE / '--- 020 word-xml (WordprocessingML) ---'.
+  TRY.
+      ls_root-title = 'Suite 020'.
+      ls_root-date  = '20260101'.
+      ls_root-time  = '120000'.
+      PERFORM fill_rand_table CHANGING ls_root-t.
+
+      CREATE OBJECT lo_file TYPE zcl_xtt_file_raw
+        EXPORTING
+          iv_name    = `xtt_suite_020_word.xml`
+          iv_xstring = zcl_js_fs=>read_file_x( `deps/xtt/src/demo/zxxt_demo_020_word-xml.w3mi.data.xml` ).
+      CREATE OBJECT lo_xtt
+        EXPORTING
+          io_file = lo_file.
+      lo_xtt->merge( iv_block_name = 'R'
+                     is_block      = ls_root ).
+      lv_raw = lo_xtt->get_raw( ).
+      zcl_js_fs=>write_file_x( iv_path = `data/xtt_suite_020_word.xml`
+                               iv_data = lv_raw ).
+
+      PERFORM raw_to_text USING lv_raw CHANGING lv_text.
+
+      PERFORM assert_free     USING lv_text `{R-` `no {R-...} markers left`.
+      PERFORM assert_contains USING lv_text `Suite 020` `{R-TITLE} replaced`.
+      PERFORM assert_contains USING lv_text `GRP B` `table rows written`.
+      PERFORM assert_contains USING lv_text `&lt;Caption 1 /&gt;` `xml symbols escaped`.
+      PERFORM assert_contains USING lv_text `<w:t>100</w:t>` `numeric field merged`.
+      PERFORM assert_contains USING lv_text `<w:t>20260102</w:t>` `date field merged`.
+      PERFORM assert_contains USING lv_text `</w:wordDocument>` `WordprocessingML still well formed`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.

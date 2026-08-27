@@ -12,6 +12,13 @@ author's own demo templates (`src/demo/*.w3mi.data.*`):
 | 080  | `;direction=column` + code-side `tree_create` (`REF TO data`) |
 | 010  | DOCX: markers broken across `<w:r>` runs, unicode |
 | 110  | images `{R-T-RAW;type=image}` → `xl/media` + drawing + rels |
+| 010  | HTML: same root, plain-text output (`zcl_xtt_html`) |
+| 020  | SpreadsheetML: `PageSetup` header/footer, `ss:Type` cell typing (`zcl_xtt_excel_xml`) |
+| 020  | WordprocessingML: numeric/date field merge (`zcl_xtt_word_xml`) |
+
+One template per test — 8 of the 64 templates in `deps/xtt/src/demo/`. The last
+three exist because `zcl_xtt_html`, `zcl_xtt_excel_xml` and `zcl_xtt_word_xml`
+were being transpiled on every build but never executed.
 
 ## Run locally
 
@@ -48,6 +55,15 @@ exposes the same via workflow_dispatch inputs).
 
 `;cond=` needs `GENERATE SUBROUTINE POOL`, which cannot exist in a
 transpiled environment.
+
+## Known gaps
+
+`;type=datetime` in SpreadsheetML renders as garbage.
+`zcl_xtt_excel_xml~on_match_found` splits a `char14` with
+`ASSIGN <lv_string>(8) TO <lv_date> CASTING`, and the transpiler does not
+reinterpret the bytes, so `lv_date`/`lv_time` come out as junk. The ABAP is
+valid — this is a transpiler gap, not an xtt bug, and it does not affect the
+typed `ss:Type="DateTime"` column path, which the suite does assert.
 
 ## License
 
