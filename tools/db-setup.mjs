@@ -150,27 +150,7 @@ function backupNow() {
 }
 
 // ---------- entry points ----------------------------------------------------------
-// runtime fix (see @abaplint/runtime float.js): Float.get() crashes on an
-// uninitialized value (NaN.toExponential has no e+/e- part -> padStart of
-// undefined). ABAP semantics: initial float is 0. Applied once per runtime.
-function patchFloat(abap) {
-  const proto = abap?.types?.Float?.prototype;
-  if (proto === undefined || proto.__localAbapPatched === true) {
-    return;
-  }
-  const origGet = proto.get;
-  proto.get = function () {
-    if (typeof this.value !== "number" || Number.isNaN(this.value)) {
-      const parsed = parseFloat(this.value);
-      this.value = Number.isNaN(parsed) ? 0 : parsed;
-    }
-    return origGet.call(this);
-  };
-  proto.__localAbapPatched = true;
-}
-
 export async function connect(abap, schemas, insert) {
-  patchFloat(abap);
   const client = new SQLiteDatabaseClient();
   const fresh = existsSync(DB_FILE) === false;
 

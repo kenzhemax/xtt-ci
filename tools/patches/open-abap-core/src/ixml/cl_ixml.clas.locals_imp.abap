@@ -126,9 +126,8 @@ CLASS lcl_named_node_map IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_ixml_named_node_map~set_named_item_ns.
-* local-abap patch: replace an existing node with the same name, otherwise
-* add it - appending unconditionally produces duplicate attributes, which
-* makes Excel/Word reject the document (PR candidate)
+* replace an existing node with the same name, otherwise add it,
+* appending unconditionally produces duplicate attributes
     DATA lv_index TYPE i.
     DATA li_node  LIKE LINE OF mt_list.
 
@@ -245,6 +244,10 @@ ENDCLASS.
 
 CLASS lcl_node IMPLEMENTATION.
   METHOD if_ixml_node~create_filter_name.
+    ASSERT 1 = 'todo'.
+  ENDMETHOD.
+
+  METHOD if_ixml_node~create_filter_parent.
     ASSERT 1 = 'todo'.
   ENDMETHOD.
 
@@ -816,6 +819,10 @@ CLASS lcl_document IMPLEMENTATION.
     ASSERT 1 = 'todo'.
   ENDMETHOD.
 
+  METHOD if_ixml_node~create_filter_parent.
+    ASSERT 1 = 'todo'.
+  ENDMETHOD.
+
   METHOD if_ixml_node~num_children.
     ASSERT 1 = 'todo'.
   ENDMETHOD.
@@ -966,21 +973,14 @@ CLASS lcl_document IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_ixml_document~get_first_child.
-    " local-abap patch: like get_root_element, skip leading #text nodes -
-    " SAP iXML returns the root element here (the prolog is not a DOM child)
+* skip whitespace #text nodes before the root element, they are not
+* part of the document structure
     DATA li_iterator TYPE REF TO if_ixml_node_iterator.
-    DATA li_node     TYPE REF TO if_ixml_node.
     li_iterator = mi_node->if_ixml_node~get_children( )->create_iterator( ).
-    DO.
-      li_node = li_iterator->get_next( ).
-      IF li_node IS INITIAL.
-        RETURN.
-      ENDIF.
-      IF li_node->get_name( ) <> '#text'.
-        child = li_node.
-        RETURN.
-      ENDIF.
-    ENDDO.
+    child = li_iterator->get_next( ).
+    WHILE child IS NOT INITIAL AND child->get_name( ) = `#text`.
+      child = li_iterator->get_next( ).
+    ENDWHILE.
   ENDMETHOD.
 
   METHOD if_ixml_document~create_attribute_ns.
@@ -1056,7 +1056,46 @@ CLASS lcl_document IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_ixml_document~find_from_path.
-    ASSERT 1 = 'todo'.
+    DATA lt_names    TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+    DATA lv_name     TYPE string.
+    DATA lv_found    TYPE abap_bool.
+    DATA li_current  TYPE REF TO if_ixml_node.
+    DATA li_children TYPE REF TO if_ixml_node_list.
+    DATA li_iterator TYPE REF TO if_ixml_node_iterator.
+    DATA li_node     TYPE REF TO if_ixml_node.
+
+    li_current = mi_node.
+
+    SPLIT path AT '/' INTO TABLE lt_names.
+
+    LOOP AT lt_names INTO lv_name.
+      IF lv_name IS INITIAL.
+        CONTINUE.
+      ENDIF.
+
+      lv_found = abap_false.
+      li_children = li_current->get_children( ).
+      li_iterator = li_children->create_iterator( ).
+      DO.
+        li_node = li_iterator->get_next( ).
+        IF li_node IS INITIAL.
+          EXIT. " current loop
+        ENDIF.
+        IF li_node->get_name( ) = lv_name.
+          li_current = li_node.
+          lv_found = abap_true.
+          EXIT. " current loop
+        ENDIF.
+      ENDDO.
+
+      IF lv_found = abap_false.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+    IF lv_found = abap_true.
+      val ?= li_current.
+    ENDIF.
   ENDMETHOD.
 
   METHOD if_ixml_document~get_elements_by_tag_name_ns.
@@ -1081,6 +1120,10 @@ CLASS lcl_document IMPLEMENTATION.
     node = mi_node.
   ENDMETHOD.
 
+  METHOD if_ixml_document~get_root_element.
+    root ?= if_ixml_document~get_first_child( ).
+  ENDMETHOD.
+
   METHOD if_ixml_document~create_text.
     " local-abap patch: plain text node
     DATA lo_node TYPE REF TO lcl_node.
@@ -1088,24 +1131,6 @@ CLASS lcl_document IMPLEMENTATION.
     lo_node->if_ixml_node~set_name( '#text' ).
     lo_node->if_ixml_node~set_value( string ).
     rval = lo_node.
-  ENDMETHOD.
-
-  METHOD if_ixml_document~get_root_element.
-    " local-abap patch: skip leading #text nodes (whitespace/BOM leftovers),
-    " the root ELEMENT is what callers expect
-    DATA li_iterator TYPE REF TO if_ixml_node_iterator.
-    DATA li_node     TYPE REF TO if_ixml_node.
-    li_iterator = mi_node->if_ixml_node~get_children( )->create_iterator( ).
-    DO.
-      li_node = li_iterator->get_next( ).
-      IF li_node IS INITIAL.
-        RETURN.
-      ENDIF.
-      IF li_node->get_name( ) <> '#text'.
-        root ?= li_node.
-        RETURN.
-      ENDIF.
-    ENDDO.
   ENDMETHOD.
 
 ENDCLASS.
@@ -1211,6 +1236,10 @@ CLASS lcl_ostream IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_ixml_ostream~set_encoding.
+    ASSERT 1 = 'todo'.
+  ENDMETHOD.
+
+  METHOD if_ixml_ostream~get_encoding.
     ASSERT 1 = 'todo'.
   ENDMETHOD.
 
@@ -1340,7 +1369,10 @@ CLASS lcl_parser IMPLEMENTATION.
 
   METHOD if_ixml_parser~parse.
 
-    DATA lv_xml       TYPE string.
+    DATA lv_xml        TYPE string.
+    DATA lv_rest       TYPE string.
+    DATA lv_whitespace TYPE string.
+    DATA lv_bom        TYPE c LENGTH 1.
     DATA lv_offset    TYPE i.
     DATA lv_value     TYPE string.
     DATA lv_name      TYPE string.
@@ -1359,9 +1391,14 @@ CLASS lcl_parser IMPLEMENTATION.
 * get the private value from istream,
     stream = mi_istream.
     WRITE '@KERNEL lv_xml.set(stream.get().mv_xml);'.
-    " local-abap patch: strip a UTF byte-order mark - otherwise the leading
-    " BOM becomes a #text node BEFORE the root element
-    WRITE '@KERNEL lv_xml.set(lv_xml.get().replace(/^﻿/, ""));'.
+
+    lv_whitespace = cl_abap_char_utilities=>get_simple_spaces_for_cur_cp( ).
+
+* strip the byte order mark, it is not part of the document
+    lv_bom = cl_abap_conv_in_ce=>uccpi( 65279 ).
+    IF lv_xml IS NOT INITIAL AND lv_xml(1) = lv_bom.
+      lv_xml = lv_xml+1.
+    ENDIF.
 
     REPLACE ALL OCCURRENCES OF |\n| IN lv_xml WITH ||.
 
@@ -1419,7 +1456,15 @@ CLASS lcl_parser IMPLEMENTATION.
       ENDIF.
 
       lv_xml = lv_xml+lv_offset.
-      CONDENSE lv_xml.
+
+* skip whitespace between tags, but never touch text content: CONDENSE
+* also removed leading blanks of a value and collapsed blanks inside it,
+* so `<t xml:space="preserve">A  B</t>` lost characters
+      lv_rest = lv_xml.
+      SHIFT lv_rest LEFT DELETING LEADING lv_whitespace.
+      IF lv_rest IS INITIAL OR lv_rest(1) = '<'.
+        lv_xml = lv_rest.
+      ENDIF.
     ENDWHILE.
 
   ENDMETHOD.
