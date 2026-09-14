@@ -640,6 +640,8 @@ FORM test_020_word_xml.
   DATA lv_raw   TYPE xstring.
   DATA lv_text  TYPE string.
   DATA lx_error TYPE REF TO cx_root.
+  DATA lv_date  TYPE d VALUE '20260102'.
+  DATA lv_date_text TYPE string.
 
   WRITE / '--- 020 word-xml (WordprocessingML) ---'.
   TRY.
@@ -668,7 +670,10 @@ FORM test_020_word_xml.
       PERFORM assert_contains USING lv_text `GRP B` `table rows written`.
       PERFORM assert_contains USING lv_text `&lt;Caption 1 /&gt;` `xml symbols escaped`.
       PERFORM assert_contains USING lv_text `<w:t>100</w:t>` `numeric field merged`.
-      PERFORM assert_contains USING lv_text `<w:t>20260102</w:t>` `date field merged`.
+      " xtt writes dates with |{ ... DATE = USER }|, so the text depends on
+      " the user's (here: the runtime locale's) date format - build it the same way
+      lv_date_text = |<w:t>{ lv_date DATE = USER }</w:t>|.
+      PERFORM assert_contains USING lv_text lv_date_text `date field merged`.
       PERFORM assert_contains USING lv_text `</w:wordDocument>` `WordprocessingML still well formed`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.

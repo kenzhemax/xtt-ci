@@ -37,7 +37,10 @@ exposes the same via workflow_dispatch inputs).
 - `tools/fetch-deps.mjs` clones xtt and the two open-abap libraries it needs (core, bal) into `deps/`
 - `tools/build.mjs` downports modern ABAP to 7.02 (abaplint `--fix`), applies
   the patch overlay from `tools/patches/` (open-abap-core gaps that are being
-  upstreamed + a few compat DDIC elements), hoists block-local `DATA` declarations
+  upstreamed + a few compat DDIC elements; each file is pinned to the upstream
+  version it was taken from in `tools/patches-upstream.json`, and the build
+  stops when upstream changes that file instead of silently reverting it),
+  hoists block-local `DATA` declarations
   (transpiler scoping workaround - `NO_HOIST=1` re-checks whether the
   transpiler bug is fixed), then transpiles everything to JavaScript.
   The ANCHORED FIXUPS list in build.mjs is currently EMPTY - upstream now

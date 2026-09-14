@@ -41,11 +41,54 @@ const hashFile = (f) => sha1(readFileSync(f));
 // overlay patches: files under tools/patches/<lib>/... replace the same path in
 // deps/<lib>/... (used to fix todo-stubs in open-abap-core, e.g. ixml set_validating).
 // Applied before fingerprinting so the cache stays consistent; survives re-cloning deps.
+//
+// A whole-file copy silently reverts anything upstream later changes in that
+// file. So tools/patches-upstream.json records the upstream git blob each overlay
+// file was taken from (null = upstream has no such file), and the build STOPS
+// when deps/ no longer matches. Then merge the upstream change into the overlay,
+// or delete the overlay file if upstream fixed it, and re-record with
+// `node tools/build.mjs --record-patches`.
+const PATCH_ROOT = join("tools", "patches");
+const PATCH_BASE_FILE = join("tools", "patches-upstream.json");
+
+function upstreamBlob(lib, path) {
+  try {
+    return execSync(`git -C deps/${lib} rev-parse HEAD:${path}`, { stdio: ["ignore", "pipe", "ignore"] })
+      .toString().trim();
+  } catch {
+    return null;
+  }
+}
+
+function checkPatchBase() {
+  const record = process.argv.includes("--record-patches");
+  const base = existsSync(PATCH_BASE_FILE) ? JSON.parse(readFileSync(PATCH_BASE_FILE, "utf8")) : {};
+  const current = {};
+  for (const patch of listFiles(PATCH_ROOT)) {
+    const rel = relative(PATCH_ROOT, patch).replace(/\\/g, "/");
+    const [lib, ...path] = rel.split("/");
+    if (!existsSync(join("deps", lib))) continue; // lib not cloned locally
+    current[rel] = upstreamBlob(lib, path.join("/"));
+  }
+  if (record) {
+    writeFileSync(PATCH_BASE_FILE, JSON.stringify(current, null, 2) + "\n");
+    console.log(`[build] recorded upstream base of ${Object.keys(current).length} overlay files`);
+    return;
+  }
+  const stale = Object.keys(current).filter((rel) => base[rel] !== current[rel]);
+  if (stale.length > 0) {
+    throw new Error(
+      "[build] UPSTREAM CHANGED files the overlay replaces - copying them would revert upstream work:\n" +
+      stale.map((rel) => `  tools/patches/${rel} (recorded ${base[rel] ?? "none"}, upstream now ${current[rel] ?? "none"})`).join("\n") +
+      "\nMerge the upstream change into the overlay (or drop the file if upstream fixed it), then run node tools/build.mjs --record-patches");
+  }
+}
+
 function applyDepsPatches() {
-  const patchRoot = join("tools", "patches");
-  for (const patch of listFiles(patchRoot)) {
-    const target = join("deps", relative(patchRoot, patch));
-    const lib = relative(patchRoot, patch).split(/[\\/]/)[0];
+  checkPatchBase();
+  for (const patch of listFiles(PATCH_ROOT)) {
+    const target = join("deps", relative(PATCH_ROOT, patch));
+    const lib = relative(PATCH_ROOT, patch).split(/[\\/]/)[0];
     if (!existsSync(join("deps", lib))) continue; // lib not cloned locally
     if (existsSync(target) && readFileSync(patch).equals(readFileSync(target))) continue;
     mkdirSync(dirname(target), { recursive: true });
