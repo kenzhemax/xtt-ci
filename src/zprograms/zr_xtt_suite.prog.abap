@@ -9,6 +9,9 @@ REPORT zr_xtt_suite.
 "   010 - HTML: same root, plain-text output (zcl_xtt_html)
 "   020 - SpreadsheetML: header/footer + ;type=datetime (zcl_xtt_excel_xml)
 "   020 - WordprocessingML: ;type=mask sums (zcl_xtt_word_xml)
+"   022 - DOCX tree: {R-T;group=_GROUP1}, ;func=SUM/FIRST, ;merge=G0, ;cond=sy-tabix
+"   030 - {DOC-} + {R-} in one document, R as a table of roots (cloned sheets)
+"   060 - relation tree {R-T;group=DIR-PAR_DIR} + PREPARE_TREE event
 " Data is deterministic so aggregates can be asserted exactly.
 
 TYPES: BEGIN OF ty_rand_row,
@@ -59,9 +62,70 @@ TYPES: BEGIN OF ty_rand_row,
          date  TYPE d,
          time  TYPE t,
          t     TYPE ty_rand_rows,
-       END OF ty_wxml_root.
+       END OF ty_wxml_root,
+       BEGIN OF ty_flight_row,
+         cityfrom TYPE c LENGTH 20,
+         cityto   TYPE c LENGTH 20,
+         carrname TYPE c LENGTH 20,
+         connid   TYPE c LENGTH 4,
+         fldate   TYPE d,
+         price    TYPE p LENGTH 8 DECIMALS 2,
+         currency TYPE c LENGTH 5,
+         seatsmax TYPE i,
+         seatsocc TYPE i,
+         _group1  TYPE string,
+       END OF ty_flight_row,
+       ty_flight_rows TYPE STANDARD TABLE OF ty_flight_row WITH DEFAULT KEY,
+       BEGIN OF ty_flight_root,
+         t TYPE ty_flight_rows,
+       END OF ty_flight_root,
+       BEGIN OF ty_doc,
+         f_title TYPE string,
+         l_title TYPE string,
+       END OF ty_doc,
+       BEGIN OF ty_blk_root,
+         title  TYPE string,
+         bottom TYPE string,
+         t      TYPE ty_rand_rows,
+       END OF ty_blk_root,
+       ty_blk_roots TYPE STANDARD TABLE OF ty_blk_root WITH DEFAULT KEY,
+       BEGIN OF ty_tree_row,
+         dir          TYPE string,
+         par_dir      TYPE string,
+         level        TYPE i,
+         sum          TYPE p LENGTH 8 DECIMALS 2,
+         has_children TYPE abap_bool,
+       END OF ty_tree_row,
+       ty_tree_rows TYPE STANDARD TABLE OF ty_tree_row WITH DEFAULT KEY,
+       BEGIN OF ty_tree_root,
+         title TYPE string,
+         t     TYPE REF TO data,
+       END OF ty_tree_root.
 
 DATA gv_failed TYPE i.
+DATA gv_tree_events TYPE i.
+
+*&---------------------------------------------------------------------*
+*& handler for the static PREPARE_TREE event of zcl_xtt_replace_block.
+*& demo 060 does the same thing: push the tree level back into the row.
+*&---------------------------------------------------------------------*
+CLASS lcl_suite_events DEFINITION.
+  PUBLIC SECTION.
+    METHODS on_prepare_tree
+      FOR EVENT prepare_tree OF zcl_xtt_replace_block
+      IMPORTING ir_tree ir_data.
+ENDCLASS.
+
+CLASS lcl_suite_events IMPLEMENTATION.
+  METHOD on_prepare_tree.
+    FIELD-SYMBOLS <ls_data> TYPE ty_tree_row.
+    gv_tree_events = gv_tree_events + 1.
+    ASSIGN ir_data->* TO <ls_data>.
+    IF <ls_data> IS ASSIGNED.
+      <ls_data>-level = ir_tree->level.
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
 
 START-OF-SELECTION.
   PERFORM test_050_tree.
@@ -72,6 +136,9 @@ START-OF-SELECTION.
   PERFORM test_010_html.
   PERFORM test_020_excel_xml.
   PERFORM test_020_word_xml.
+  PERFORM test_022_docx_tree.
+  PERFORM test_030_blocks.
+  PERFORM test_060_tree_relat.
 
   IF gv_failed = 0.
     WRITE / 'ALL XTT SUITE TESTS PASSED'.
@@ -586,6 +653,9 @@ FORM test_020_excel_xml.
   DATA lv_raw   TYPE xstring.
   DATA lv_text  TYPE string.
   DATA lx_error TYPE REF TO cx_root.
+  DATA lv_date  TYPE d VALUE '20260101'.
+  DATA lv_time  TYPE t VALUE '120000'.
+  DATA lv_stamp TYPE string.
 
   WRITE / '--- 020 excel-xml (SpreadsheetML) ---'.
   TRY.
@@ -617,12 +687,11 @@ FORM test_020_excel_xml.
       PERFORM assert_contains USING lv_text `ss:Type="Number">300<` `numeric cell typed as Number`.
       PERFORM assert_contains USING lv_text `ss:Type="DateTime">2026-01-05T` `date cell typed as DateTime`.
       PERFORM assert_contains USING lv_text `</Workbook>` `SpreadsheetML still well formed`.
-      " NOTE: {R-DATETIME;type=datetime} in the PageSetup footer is deliberately
-      " NOT asserted - it renders as garbage here. zcl_xtt_excel_xml~on_match_found
-      " splits a char14 via ASSIGN <lv_string>(8) TO <lv_date> CASTING, and the
-      " transpiler does not reinterpret the bytes, so lv_date/lv_time come out as
-      " junk. Valid ABAP, transpiler gap - see "Known gaps" in the README. The
-      " typed ss:Type="DateTime" column above is the path that does work.
+      " Outside a typed cell ;type=datetime goes through zcl_xtt_replace_block,
+      " which writes |{ date DATE = USER } { time TIME = USER }|. The text depends
+      " on the runtime locale, so the expectation is built the same way.
+      lv_stamp = |Date &amp; time: { lv_date DATE = USER } { lv_time TIME = USER }|.
+      PERFORM assert_contains USING lv_text lv_stamp `{R-DATETIME;type=datetime} formatted in the footer`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.
@@ -675,6 +744,320 @@ FORM test_020_word_xml.
       lv_date_text = |<w:t>{ lv_date DATE = USER }</w:t>|.
       PERFORM assert_contains USING lv_text lv_date_text `date field merged`.
       PERFORM assert_contains USING lv_text `</w:wordDocument>` `WordprocessingML still well formed`.
+    CATCH cx_root INTO lx_error.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
+  ENDTRY.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 4 flight rows in 2 groups (_group1 = cityfrom-cityto). Values are picked
+*& so no subtotal can be mistaken for a single flight:
+*&   price    100 + 200 = 300    400 + 800 = 1200
+*&   seatsmax  10 +  20 =  30     40 +  80 =  120
+*&   seatsocc   1 +   2 =   3      4 +   8 =   12
+*&---------------------------------------------------------------------*
+FORM fill_flight_table CHANGING ct_table TYPE ty_flight_rows.
+  DATA ls_row TYPE ty_flight_row.
+  CLEAR ct_table.
+
+  ls_row-cityfrom = 'FRANKFURT'.
+  ls_row-cityto   = 'NEW YORK'.
+  ls_row-carrname = 'United Airlines'.
+  ls_row-currency = 'USD'.
+  ls_row-connid   = '0017'.
+  ls_row-fldate   = '20260101'.
+  ls_row-price    = 100.
+  ls_row-seatsmax = 10.
+  ls_row-seatsocc = 1.
+  CONCATENATE ls_row-cityfrom ls_row-cityto INTO ls_row-_group1 SEPARATED BY '-'.
+  APPEND ls_row TO ct_table.
+
+  ls_row-connid   = '0018'.
+  ls_row-fldate   = '20260102'.
+  ls_row-price    = 200.
+  ls_row-seatsmax = 20.
+  ls_row-seatsocc = 2.
+  APPEND ls_row TO ct_table.
+
+  ls_row-cityfrom = 'BERLIN'.
+  ls_row-cityto   = 'LONDON'.
+  ls_row-carrname = 'Lufthansa'.
+  ls_row-currency = 'EUR'.
+  ls_row-connid   = '0400'.
+  ls_row-fldate   = '20260103'.
+  ls_row-price    = 400.
+  ls_row-seatsmax = 40.
+  ls_row-seatsocc = 4.
+  CONCATENATE ls_row-cityfrom ls_row-cityto INTO ls_row-_group1 SEPARATED BY '-'.
+  APPEND ls_row TO ct_table.
+
+  ls_row-connid   = '0401'.
+  ls_row-fldate   = '20260104'.
+  ls_row-price    = 800.
+  ls_row-seatsmax = 80.
+  ls_row-seatsocc = 8.
+  APPEND ls_row TO ct_table.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& word/document.xml as plain text: every cell ends in |, every row in #
+*&---------------------------------------------------------------------*
+FORM docx_flat_text USING iv_raw TYPE xstring
+                    CHANGING cv_text TYPE string.
+  PERFORM zip_part USING iv_raw `word/document.xml` CHANGING cv_text.
+  REPLACE ALL OCCURRENCES OF `</w:tc>` IN cv_text WITH `|`.
+  REPLACE ALL OCCURRENCES OF `</w:tr>` IN cv_text WITH `#`.
+  REPLACE ALL OCCURRENCES OF REGEX '<[^>]*>' IN cv_text WITH ''.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& first row of a docx_flat_text result that contains iv_sub
+*&---------------------------------------------------------------------*
+FORM flat_row USING iv_text TYPE string
+                    iv_sub  TYPE string
+              CHANGING cv_row TYPE string.
+  DATA lt_rows TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+  DATA lv_row  TYPE string.
+  CLEAR cv_row.
+  SPLIT iv_text AT `#` INTO TABLE lt_rows.
+  LOOP AT lt_rows INTO lv_row.
+    IF lv_row CS iv_sub.
+      cv_row = lv_row.
+      EXIT.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 022 tree in DOCX with the demo's own grouped template 022_grp:
+*&   {R-T;group=_GROUP1}  level 2 = flights, level 1 = subtotal per group
+*&   ;func=SUM and ;func=FIRST on the subtotal row, ;merge=G0 cells,
+*&   ;cond=sy-tabix;type=integer = position of the flight inside its group
+*&---------------------------------------------------------------------*
+FORM test_022_docx_tree.
+  DATA ls_root  TYPE ty_flight_root.
+  DATA lo_file  TYPE REF TO zif_xtt_file.
+  DATA lo_xtt   TYPE REF TO zcl_xtt_word_docx.
+  DATA lv_raw   TYPE xstring.
+  DATA lv_xml   TYPE string.
+  DATA lv_text  TYPE string.
+  DATA lv_row   TYPE string.
+  DATA lx_error TYPE REF TO cx_root.
+
+  WRITE / '--- 022 tree in docx (group= + func=SUM/FIRST + merge=G0 + cond=) ---'.
+  TRY.
+      PERFORM fill_flight_table CHANGING ls_root-t.
+
+      CREATE OBJECT lo_file TYPE zcl_xtt_file_raw
+        EXPORTING
+          iv_name    = `xtt_suite_022.docx`
+          iv_xstring = zcl_js_fs=>read_file_x( `deps/xtt/src/demo/zxxt_demo_022_grp-docx.w3mi.data.docx` ).
+      CREATE OBJECT lo_xtt
+        EXPORTING
+          io_file = lo_file.
+      lo_xtt->merge( iv_block_name = 'R'
+                     is_block      = ls_root ).
+      lv_raw = lo_xtt->get_raw( ).
+      zcl_js_fs=>write_file_x( iv_path = `data/xtt_suite_022.docx`
+                               iv_data = lv_raw ).
+
+      PERFORM zip_part USING lv_raw `word/document.xml` CHANGING lv_xml.
+      PERFORM docx_flat_text USING lv_raw CHANGING lv_text.
+
+      PERFORM assert_free     USING lv_xml `{R-` `no {R-...} markers left`.
+      PERFORM assert_contains USING lv_text `|0017|1|` `;cond=sy-tabix: first flight of group 1`.
+      PERFORM assert_contains USING lv_text `|0018|2|` `;cond=sy-tabix: second flight of group 1`.
+      PERFORM assert_contains USING lv_text `|0400|1|` `;cond=sy-tabix restarts in group 2`.
+      PERFORM assert_contains USING lv_text `|0401|2|` `;cond=sy-tabix: second flight of group 2`.
+      " Subtotal rows. The template's empty cells hold U+00A0, so each row is
+      " picked by a value only a subtotal can have and then checked cell by cell.
+      PERFORM flat_row USING lv_text `|300|` CHANGING lv_row.
+      PERFORM assert_contains USING lv_row `|300|` `group 1 subtotal row: ;func=SUM price 100 + 200`.
+      PERFORM assert_contains USING lv_row `|30|3|` `group 1 subtotal: ;func=SUM seats 30 / 3`.
+      PERFORM assert_contains USING lv_row `|FRANKFURT|NEW YORK|United Airlines|` `group 1 subtotal: ;func=FIRST values`.
+      PERFORM assert_free     USING lv_row `|0017|` `group 1 subtotal is its own row, not a flight`.
+      PERFORM flat_row USING lv_text `|1200|` CHANGING lv_row.
+      PERFORM assert_contains USING lv_row `|1200|` `group 2 subtotal row: ;func=SUM price 400 + 800`.
+      PERFORM assert_contains USING lv_row `|120|12|` `group 2 subtotal: ;func=SUM seats 120 / 12`.
+      PERFORM assert_contains USING lv_row `|BERLIN|LONDON|Lufthansa|` `group 2 subtotal: ;func=FIRST values`.
+      PERFORM assert_free     USING lv_row `|0400|` `group 2 subtotal is its own row, not a flight`.
+      PERFORM assert_contains USING lv_xml `<w:vMerge` `;merge=G0 produced merged cells`.
+      PERFORM assert_valid_office USING lv_raw `valid docx (no duplicate attributes)`.
+    CATCH cx_root INTO lx_error.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
+  ENDTRY.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 030 two root blocks in one document: {DOC-} merged separately from {R-},
+*& and R is a TABLE of roots - the template's {R-TITLE} sheet is cloned once
+*& per entry, named by TITLE, and the template sheet itself is kept hidden
+*&---------------------------------------------------------------------*
+FORM test_030_blocks.
+  DATA ls_doc   TYPE ty_doc.
+  DATA lt_root  TYPE ty_blk_roots.
+  DATA ls_root  TYPE ty_blk_root.
+  DATA lo_file  TYPE REF TO zif_xtt_file.
+  DATA lo_xtt   TYPE REF TO zcl_xtt_excel_xlsx.
+  DATA lv_raw   TYPE xstring.
+  DATA lv_book  TYPE string.
+  DATA lv_str   TYPE string.
+  DATA lx_error TYPE REF TO cx_root.
+
+  WRITE / '--- 030 nested blocks: DOC + R as a table of roots ---'.
+  TRY.
+      ls_doc-f_title = 'First title'.
+      ls_doc-l_title = 'Last title'.
+
+      ls_root-title  = 'Title 1'.
+      ls_root-bottom = 'Bottom 1'.
+      PERFORM fill_rand_table CHANGING ls_root-t.
+      APPEND ls_root TO lt_root.
+      ls_root-title  = 'Title 2'.
+      ls_root-bottom = 'Bottom 2'.
+      APPEND ls_root TO lt_root.
+
+      CREATE OBJECT lo_file TYPE zcl_xtt_file_raw
+        EXPORTING
+          iv_name    = `xtt_suite_030.xlsx`
+          iv_xstring = zcl_js_fs=>read_file_x( `deps/xtt/src/demo/zxxt_demo_030_c-xlsx.w3mi.data.xlsx` ).
+      CREATE OBJECT lo_xtt
+        EXPORTING
+          io_file = lo_file.
+
+      " two separate merges into the same document
+      lo_xtt->merge( iv_block_name = 'DOC'
+                     is_block      = ls_doc ).
+      lo_xtt->merge( iv_block_name = 'R'
+                     is_block      = lt_root ).
+
+      lv_raw = lo_xtt->get_raw( ).
+      zcl_js_fs=>write_file_x( iv_path = `data/xtt_suite_030.xlsx`
+                               iv_data = lv_raw ).
+
+      PERFORM zip_part USING lv_raw `xl/workbook.xml` CHANGING lv_book.
+      PERFORM zip_part USING lv_raw `xl/sharedStrings.xml` CHANGING lv_str.
+
+      PERFORM assert_contains USING lv_book `name="Title 1"` `first R entry cloned into its own sheet`.
+      PERFORM assert_contains USING lv_book `name="Title 2"` `second R entry cloned into its own sheet`.
+      PERFORM assert_contains USING lv_book `name="{R-TITLE}" state="veryHidden"` `template sheet kept, hidden`.
+      PERFORM assert_contains USING lv_book `name="First sheet"` `static first sheet kept`.
+      PERFORM assert_contains USING lv_book `name="Last sheet"` `static last sheet kept`.
+      PERFORM assert_free     USING lv_str `{DOC-` `no {DOC-...} markers left`.
+      PERFORM assert_contains USING lv_str `First title` `{DOC-F_TITLE} replaced`.
+      PERFORM assert_contains USING lv_str `Last title` `{DOC-L_TITLE} replaced`.
+      PERFORM assert_contains USING lv_str `Title 2` `{R-TITLE} written into the cloned sheet`.
+      PERFORM assert_contains USING lv_str `GRP B` `nested table rows written`.
+      PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
+    CATCH cx_root INTO lx_error.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
+  ENDTRY.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 5 deterministic folder nodes, parent/child by DIR then PAR_DIR
+*& leaf sums 100 + 200 + 300 = 600
+*&---------------------------------------------------------------------*
+FORM fill_folder_tree CHANGING ct_table TYPE ty_tree_rows.
+  DATA ls_row TYPE ty_tree_row.
+  CLEAR ct_table.
+
+  CLEAR ls_row.
+  ls_row-dir          = 'R:'.
+  ls_row-has_children = abap_true.
+  APPEND ls_row TO ct_table.
+
+  CLEAR ls_row.
+  ls_row-dir          = 'R:/alpha'.
+  ls_row-par_dir      = 'R:'.
+  ls_row-has_children = abap_true.
+  APPEND ls_row TO ct_table.
+
+  CLEAR ls_row.
+  ls_row-dir     = 'R:/alpha/one'.
+  ls_row-par_dir = 'R:/alpha'.
+  ls_row-sum     = 100.
+  APPEND ls_row TO ct_table.
+
+  CLEAR ls_row.
+  ls_row-dir     = 'R:/alpha/two'.
+  ls_row-par_dir = 'R:/alpha'.
+  ls_row-sum     = 200.
+  APPEND ls_row TO ct_table.
+
+  CLEAR ls_row.
+  ls_row-dir     = 'R:/beta'.
+  ls_row-par_dir = 'R:'.
+  ls_row-sum     = 300.
+  APPEND ls_row TO ct_table.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 060_fm relation tree declared in the template: {R-T;group=DIR-PAR_DIR}
+*& plus the static PREPARE_TREE event of zcl_xtt_replace_block
+*&---------------------------------------------------------------------*
+FORM test_060_tree_relat.
+  DATA ls_root  TYPE ty_tree_root.
+  DATA lr_tab   TYPE REF TO ty_tree_rows.
+  DATA lo_file  TYPE REF TO zif_xtt_file.
+  DATA lo_xtt   TYPE REF TO zcl_xtt_excel_xlsx.
+  DATA lo_hand  TYPE REF TO lcl_suite_events.
+  DATA lv_raw   TYPE xstring.
+  DATA lv_all   TYPE string.
+  DATA lv_text  TYPE string.
+  DATA lv_ok    TYPE abap_bool.
+  DATA lx_error TYPE REF TO cx_root.
+
+  WRITE / '--- 060_fm relation tree group=DIR-PAR_DIR + event ---'.
+  TRY.
+      ls_root-title = 'Suite 060'.
+      CREATE DATA lr_tab.
+      PERFORM fill_folder_tree CHANGING lr_tab->*.
+      ls_root-t = lr_tab.
+
+      " tree levels are handed to the caller through a static event
+      CREATE OBJECT lo_hand.
+      gv_tree_events = 0.
+      SET HANDLER lo_hand->on_prepare_tree ACTIVATION abap_true.
+
+      CREATE OBJECT lo_file TYPE zcl_xtt_file_raw
+        EXPORTING
+          iv_name    = `xtt_suite_060.xlsx`
+          iv_xstring = zcl_js_fs=>read_file_x( `deps/xtt/src/demo/zxxt_demo_060_fm-xlsx.w3mi.data.xlsx` ).
+      CREATE OBJECT lo_xtt
+        EXPORTING
+          io_file = lo_file.
+      lo_xtt->merge( iv_block_name = 'R'
+                     is_block      = ls_root ).
+
+      SET HANDLER lo_hand->on_prepare_tree ACTIVATION abap_false.
+
+      lv_raw = lo_xtt->get_raw( ).
+      zcl_js_fs=>write_file_x( iv_path = `data/xtt_suite_060.xlsx`
+                               iv_data = lv_raw ).
+
+      PERFORM zip_part USING lv_raw `xl/sharedStrings.xml` CHANGING lv_all.
+      PERFORM zip_part USING lv_raw `xl/worksheets/sheet1.xml` CHANGING lv_text.
+      CONCATENATE lv_all lv_text INTO lv_all.
+
+      PERFORM assert_free     USING lv_all `{R-` `no {R-...} markers left`.
+      PERFORM assert_contains USING lv_all `Suite 060` `{R-TITLE} replaced`.
+      PERFORM assert_contains USING lv_all `R:/alpha/one` `leaf node written`.
+      PERFORM assert_contains USING lv_all `R:/beta` `sibling node written`.
+      PERFORM assert_contains USING lv_all `<v>600</v>` `;func=SUM over leaves = 600`.
+      IF gv_tree_events > 0.
+        lv_ok = abap_true.
+      ELSE.
+        lv_ok = abap_false.
+      ENDIF.
+      PERFORM assert USING lv_ok `PREPARE_TREE event fired`.
+      PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.
       lv_msg = |exception: { lx_error->get_text( ) }|.
