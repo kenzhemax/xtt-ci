@@ -15,10 +15,20 @@ author's own demo templates (`src/demo/*.w3mi.data.*`):
 | 010  | HTML: same root, plain-text output (`zcl_xtt_html`) |
 | 020  | SpreadsheetML: `PageSetup` header/footer, `ss:Type` cell typing (`zcl_xtt_excel_xml`) |
 | 020  | WordprocessingML: numeric/date field merge (`zcl_xtt_word_xml`) |
+| 022  | DOCX tree `{R-T;group=_GROUP1}`: `;func=SUM/FIRST` subtotals, `;merge=G0`, `;cond=sy-tabix` (asserted exactly) |
+| 030  | two root blocks `{DOC-…}` + `{R-…}`, `R` as a table of roots — one cloned sheet per entry |
+| 060  | relation tree `{R-T;group=DIR-PAR_DIR}` + the static `PREPARE_TREE` event |
 
-One template per test — 8 of the 64 templates in `deps/xtt/src/demo/`. The last
-three exist because `zcl_xtt_html`, `zcl_xtt_excel_xml` and `zcl_xtt_word_xml`
-were being transpiled on every build but never executed.
+One template per test — 11 of the 64 templates in `deps/xtt/src/demo/`.
+
+The demo *programs* are still not built. Upstream now ships the demos as
+global classes (`zcl_xtt_demo_NNN`, driven by `zcl_xtt_open_report~web_generate`),
+but running them here would take more than the classes: the demo base class
+references `cl_gui_alv_grid` and `lvc_*` types, templates are read through
+`zcl_xtt_file_smw0` (`WWWDATA`) by default, demo 022 selects from
+`spfli`/`sflight`, and the demo data is random, so aggregates could not be
+asserted exactly. The suite ports `set_merge_info` by hand with deterministic
+data instead.
 
 ## Run locally
 
@@ -54,19 +64,18 @@ exposes the same via workflow_dispatch inputs).
   run on a real SAP system
 - `tools/run.mjs` executes it on Node.js with an in-memory SQLite database
 
-## Not supported
-
-`;cond=` needs `GENERATE SUBROUTINE POOL`, which cannot exist in a
-transpiled environment.
-
 ## Known gaps
 
-`;type=datetime` in SpreadsheetML renders as garbage.
-`zcl_xtt_excel_xml~on_match_found` splits a `char14` with
-`ASSIGN <lv_string>(8) TO <lv_date> CASTING`, and the transpiler does not
-reinterpret the bytes, so `lv_date`/`lv_time` come out as junk. The ABAP is
-valid — this is a transpiler gap, not an xtt bug, and it does not affect the
-typed `ss:Type="DateTime"` column path, which the suite does assert.
+XLSX `;merge=` fails when xtt has to add a `<mergeCells>` element the template
+sheet does not have yet. `zcl_xtt_xml_updater~obj_replace` inserts it after
+`<sheetData>` with `if_ixml_node~insert_child`, which open-abap-core still
+stubs as `ASSERT 1 = 'todo'`, so saving the sheet dies with `CONVT_NO_NUMBER`.
+This is why template `030_b` is not used.
+
+`;cond=` works through xtt's own expression parser — test 022 asserts
+`;cond=sy-tabix`. A condition the parser cannot handle falls back to
+`PERFORM (form) IN PROGRAM (prog)` in the calling report; that path is not
+exercised here.
 
 ## License
 
