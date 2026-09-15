@@ -15,8 +15,5 @@
   "open-abap-core/src/compat/zcompat.fugr.lzcompattop.abap": null,
   "open-abap-core/src/compat/zcompat.fugr.saplzcompat.abap": null,
   "open-abap-core/src/compat/zcompat.fugr.trint_split_file_and_path.abap": null,
-  "open-abap-core/src/compat/zcompat.fugr.xml": null,
-  "open-abap-core/src/ixml/cl_ixml.clas.locals_imp.abap": "d9341abf0e5676e701df99d67c21eb49dee073cd",
-  "open-abap-core/src/ixml/if_ixml_document.intf.abap": "49d92a4b1ed6a0c40b6e9c6797c04f44413d4d7c",
-  "open-abap-core/src/ixml/if_ixml_text.intf.abap": null
+  "open-abap-core/src/compat/zcompat.fugr.xml": null
 }
