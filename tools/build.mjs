@@ -23,6 +23,13 @@ import { join, dirname, relative } from "node:path";
 const WORK = ".downport";
 const CACHE_FILE = ".buildcache.json";
 const FORCE = process.argv.includes("--force");
+// NO_HOIST=1 switches declaration hoisting off (see hoistDeclarations), to
+// re-check whether the transpiler still needs it. HOIST_VERSION is part of the
+// global fingerprint, so flipping the flag always forces a full rebuild -
+// otherwise an incremental build reuses hoisted output and the re-check passes
+// without testing anything.
+const HOIST = process.env.NO_HOIST !== "1";
+const HOIST_VERSION = HOIST ? "hoist-v5" : "hoist-off"; // TYPE only (LIKE is order-dependent); v3: single-line DATA: chains; v4: only from nested blocks (method-top DATA may follow local TYPES); v5: FIELD-SYMBOLS too
 
 function listFiles(dir) {
   const out = [];
@@ -140,7 +147,7 @@ function globalFingerprint() {
   const configs = ["abap_transpile.json", "package.json", "tools/build.mjs", "tools/transpile.mjs"]
     .map((f) => (existsSync(f) ? hashFile(f) : "missing"))
     .join("|");
-  return sha1(configs + "|" + depsFingerprint());
+  return sha1(configs + "|" + HOIST_VERSION + "|" + depsFingerprint());
 }
 
 // ---- collect current state ------------------------------------------------
@@ -262,11 +269,11 @@ function libFingerprint(dir) {
 // block (ABAP semantics is method scope) -> ReferenceError when used after
 // the block. Hoisting single-line declarations to the top of the method is
 // semantically neutral in ABAP and sidesteps the bug for ported libs.
-// NO_HOIST=1 disables the workaround, to re-check whether the transpiler bug is
-// fixed upstream (as of @abaplint/transpiler 2.13.52 it is not: the suite dies
-// with "ReferenceError: l_x_value is not defined" in zcl_xtt_excel_xlsx).
-const HOIST = process.env.NO_HOIST !== "1";
-const HOIST_VERSION = HOIST ? "hoist-v5" : "hoist-off"; // TYPE only (LIKE is order-dependent); v3: single-line DATA: chains; v4: only from nested blocks (method-top DATA may follow local TYPES); v5: FIELD-SYMBOLS too
+// Still present in @abaplint/transpiler 2.13.87: a DATA declared inside an IF
+// and read after it dies with "ReferenceError: lv_inner is not defined"
+// (checked with a minimal program). xtt 3b5a0a9 itself no longer contains the
+// pattern - NO_HOIST=1 passes the suite - so this is a safety net for the next
+// upstream change. HOIST / HOIST_VERSION are defined at the top of the file.
 // FIELD-SYMBOLS are method-scoped in ABAP exactly like DATA and hit the same
 // transpiler bug: zcl_xtt_excel_xml~on_match_found declares <lv_date> inside
 // one CASE branch and reads it in another (and after the CASE), which becomes
