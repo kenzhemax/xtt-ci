@@ -138,6 +138,7 @@ START-OF-SELECTION.
   PERFORM test_020_word_xml.
   PERFORM test_022_docx_tree.
   PERFORM test_030_blocks.
+  PERFORM test_030_merge.
   PERFORM test_060_tree_relat.
 
   IF gv_failed = 0.
@@ -952,6 +953,85 @@ FORM test_030_blocks.
       PERFORM assert_contains USING lv_str `Last title` `{DOC-L_TITLE} replaced`.
       PERFORM assert_contains USING lv_str `Title 2` `{R-TITLE} written into the cloned sheet`.
       PERFORM assert_contains USING lv_str `GRP B` `nested table rows written`.
+      PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
+    CATCH cx_root INTO lx_error.
+      DATA lv_msg TYPE string.
+      lv_msg = |exception: { lx_error->get_text( ) }|.
+      PERFORM assert USING abap_false lv_msg.
+  ENDTRY.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& 030_b: ;merge=X on a sheet that carries no <mergeCells> element yet.
+*& xtt has to add one, which it does with if_ixml_node~insert_child -
+*& a todo stub in open-abap-core until #1243
+*&---------------------------------------------------------------------*
+FORM test_030_merge.
+  DATA ls_doc    TYPE ty_doc.
+  DATA lt_root   TYPE ty_blk_roots.
+  DATA ls_root   TYPE ty_blk_root.
+  DATA lo_file   TYPE REF TO zif_xtt_file.
+  DATA lo_xtt    TYPE REF TO zcl_xtt_excel_xlsx.
+  DATA lo_zip    TYPE REF TO cl_abap_zip.
+  DATA lv_raw    TYPE xstring.
+  DATA lv_hex    TYPE xstring.
+  DATA lv_sheets TYPE string.
+  DATA lv_text   TYPE string.
+  DATA lv_str    TYPE string.
+  DATA lv_book   TYPE string.
+  DATA lx_error  TYPE REF TO cx_root.
+  FIELD-SYMBOLS <ls_file> LIKE LINE OF lo_zip->files.
+
+  WRITE / '--- 030_b merge=X: a mergeCells element is added ---'.
+  TRY.
+      ls_doc-f_title = 'First title'.
+      ls_doc-l_title = 'Last title'.
+
+      ls_root-title  = 'Title 1'.
+      ls_root-bottom = 'Bottom 1'.
+      PERFORM fill_rand_table CHANGING ls_root-t.
+      APPEND ls_root TO lt_root.
+
+      CREATE OBJECT lo_file TYPE zcl_xtt_file_raw
+        EXPORTING
+          iv_name    = `xtt_suite_030_b.xlsx`
+          iv_xstring = zcl_js_fs=>read_file_x( `deps/xtt/src/demo/zxxt_demo_030_b-xlsx.w3mi.data.xlsx` ).
+      CREATE OBJECT lo_xtt
+        EXPORTING
+          io_file = lo_file.
+
+      lo_xtt->merge( iv_block_name = 'DOC'
+                     is_block      = ls_doc ).
+      lo_xtt->merge( iv_block_name = 'R'
+                     is_block      = lt_root ).
+
+      lv_raw = lo_xtt->get_raw( ).
+      zcl_js_fs=>write_file_x( iv_path = `data/xtt_suite_030_b.xlsx`
+                               iv_data = lv_raw ).
+
+      " a cloned sheet gets a number of its own, so read every sheet part
+      CREATE OBJECT lo_zip.
+      lo_zip->load( lv_raw ).
+      LOOP AT lo_zip->files ASSIGNING <ls_file>.
+        CHECK <ls_file>-name CP 'xl/worksheets/sheet*.xml'.
+        CLEAR lv_hex.
+        lo_zip->get( EXPORTING name    = <ls_file>-name
+                     IMPORTING content = lv_hex
+                     EXCEPTIONS zip_index_error = 1 ).
+        CHECK sy-subrc = 0.
+        lv_text = zcl_eui_conv=>xstring_to_string( lv_hex ).
+        CONCATENATE lv_sheets lv_text INTO lv_sheets.
+      ENDLOOP.
+
+      PERFORM zip_part USING lv_raw `xl/sharedStrings.xml` CHANGING lv_str.
+      PERFORM zip_part USING lv_raw `xl/workbook.xml` CHANGING lv_book.
+
+      PERFORM assert_contains USING lv_sheets `<mergeCells` `mergeCells element added to a sheet without one`.
+      PERFORM assert_contains USING lv_sheets `<mergeCell ref=` `cells merged by ;merge=X`.
+      " the markers stay in sharedStrings: the template sheet is kept, hidden
+      PERFORM assert_contains USING lv_book `name="Merged cells Title 1"` `sheet cloned and named by TITLE`.
+      PERFORM assert_contains USING lv_book `state="veryHidden"` `template sheet kept, hidden`.
+      PERFORM assert_contains USING lv_str `Title 1` `{R-TITLE} written`.
       PERFORM assert_valid_office USING lv_raw `valid xlsx (no duplicate attributes)`.
     CATCH cx_root INTO lx_error.
       DATA lv_msg TYPE string.

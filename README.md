@@ -17,9 +17,10 @@ author's own demo templates (`src/demo/*.w3mi.data.*`):
 | 020  | WordprocessingML: numeric/date field merge (`zcl_xtt_word_xml`) |
 | 022  | DOCX tree `{R-T;group=_GROUP1}`: `;func=SUM/FIRST` subtotals, `;merge=G0`, `;cond=sy-tabix` (asserted exactly) |
 | 030  | two root blocks `{DOC-…}` + `{R-…}`, `R` as a table of roots — one cloned sheet per entry |
+| 030_b | `;merge=X` on a sheet that carries no `<mergeCells>` yet — xtt adds the element through `if_ixml_node~insert_child` (open-abap-core#1243) |
 | 060  | relation tree `{R-T;group=DIR-PAR_DIR}` + the static `PREPARE_TREE` event |
 
-One template per test — 11 of the 64 templates in `deps/xtt/src/demo/`.
+One template per test — 12 of the 64 templates in `deps/xtt/src/demo/`.
 
 The demo *programs* are still not built. Upstream now ships the demos as
 global classes (`zcl_xtt_demo_NNN`, driven by `zcl_xtt_open_report~web_generate`),
@@ -65,12 +66,6 @@ exposes the same via workflow_dispatch inputs).
 - `tools/run.mjs` executes it on Node.js with an in-memory SQLite database
 
 ## Known gaps
-
-XLSX `;merge=` fails when xtt has to add a `<mergeCells>` element the template
-sheet does not have yet. `zcl_xtt_xml_updater~obj_replace` inserts it after
-`<sheetData>` with `if_ixml_node~insert_child`, which open-abap-core still
-stubs as `ASSERT 1 = 'todo'`, so saving the sheet dies with `CONVT_NO_NUMBER`.
-This is why template `030_b` is not used.
 
 `;cond=` works through xtt's own expression parser — test 022 asserts
 `;cond=sy-tabix`. A condition the parser cannot handle falls back to
