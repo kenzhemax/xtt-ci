@@ -1,0 +1,18 @@
+{
+  "ZCL_XTT/LCL_TEST->SMW0_NO_FILE": "ZCL_XTT_FILE_SMW0 is not built (needs WWWDATA/SMW0)",
+  "ZCL_XTT/LCL_TEST->LOG_SHEET_ROWS": "ZCL_XTT_FILE_SMW0 is not built (needs WWWDATA/SMW0)",
+  "ZCL_XTT/LCL_TEST->OAOR_NO_FILE": "ZCL_XTT_FILE_OAOR is not built (needs the business document navigator)",
+  "ZCL_XTT_COND/LCL_EXPRESSION_TEXT_TEST->COUNTRY_DATE_VALUES": "DDIC table T005X (country formats) is missing",
+  "ZCL_XTT_COND/LCL_EXPRESSION_TEXT_TEST->COUNTRY_REJECTS_TEXT": "DDIC table T005X (country formats) is missing",
+  "ZCL_XTT_COND/LCL_EXPRESSION_TEXT_TEST->COUNTRY_UNKNOWN": "DDIC table T005X (country formats) is missing",
+  "ZCL_XTT_COND/LCL_EXPRESSION_TEXT_TEST->FAILED_RECOMPILE": "uses demo class ZCL_XTT_DEMO_160, demo/ is not built",
+  "ZCL_XTT_COND/LCL_CALL_TEST->FULLNAME": "uses demo class ZCL_XTT_DEMO_160, demo/ is not built",
+  "ZCL_XTT_COND/LCL_CALL_TEST->DATE_DEFAULT_LANGUAGE": "uses demo class ZCL_XTT_DEMO_160, demo/ is not built",
+  "ZCL_XTT_COND/LCL_CALL_TEST->DATE_EXPLICIT_LANGUAGE": "uses demo class ZCL_XTT_DEMO_160, demo/ is not built",
+  "ZCL_XTT_COND/LCL_CALL_TEST->COND_FULLNAME": "uses demo class ZCL_XTT_DEMO_160, demo/ is not built",
+  "ZCL_XTT_COND/LCL_CALL_TEST->ACTUAL_MONTH_NAMES": "uses demo class ZCL_XTT_DEMO_160, demo/ is not built",
+  "ZCL_XTT_COND/LCL_CALL_TEST->MONTH_NAMES_LAYOUTS": "type WDR_DATE_NAV_MONTH_NAME_TAB is missing",
+  "ZCL_XTT_COND/LCL_EXPRESSION_TEXT_TEST->DEMO_USER_FORMATS": "runtime difference, not analysed yet: lcl_node_user_format calls ->resolve( ) on a value that has no such method",
+  "ZCL_XTT_COND/LCL_EXPRESSION_TEXT_TEST->DEMO_INVALID_OPERANDS": "runtime difference, not analysed yet: an invalid operand does not raise ZCX_XTT_EXCEPTION",
+  "ZCL_XTT_COND/LCL_EXPRESSION_BOOLEAN_TEST->BOOLEAN_RESULTS": "runtime difference, not analysed yet: a false literal evaluates to ` ` instead of ``"
+}

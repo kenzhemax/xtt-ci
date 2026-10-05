@@ -17,6 +17,12 @@ CLASS zcl_eui_logger DEFINITION PUBLIC CREATE PUBLIC.
         single_msg TYPE i VALUE 4,
       END OF mc_profile.
 
+    " iv_msg_types/iv_unique are kept for API compatibility: xtt passes them,
+    " this collector keeps every message
+    METHODS constructor
+      IMPORTING iv_msg_types TYPE string DEFAULT mc_msg_types-all
+                iv_unique    TYPE abap_bool OPTIONAL.
+
     " add message from sy fields (iv_syst path) or explicit symsg
     METHODS add
       IMPORTING iv_msgty TYPE csequence OPTIONAL
@@ -51,7 +57,9 @@ CLASS zcl_eui_logger DEFINITION PUBLIC CREATE PUBLIC.
                 is_profile TYPE bal_s_prof OPTIONAL.
 
     METHODS show_as_button
-      IMPORTING is_profile TYPE bal_s_prof OPTIONAL.
+      IMPORTING iv_write_message TYPE csequence OPTIONAL
+                is_profile       TYPE bal_s_prof OPTIONAL
+      RETURNING VALUE(ro_logger) TYPE REF TO zcl_eui_logger.
 
     METHODS clear.
   PRIVATE SECTION.
@@ -59,7 +67,9 @@ CLASS zcl_eui_logger DEFINITION PUBLIC CREATE PUBLIC.
              msgid TYPE symsgid,
              msgno TYPE symsgno,
            END OF ts_skip.
-    DATA mt_messages TYPE sfb_t_bal_s_msg.
+    DATA mt_messages  TYPE sfb_t_bal_s_msg.
+    DATA mv_msg_types TYPE string.
+    DATA mv_unique    TYPE abap_bool.
     DATA mt_skip     TYPE STANDARD TABLE OF ts_skip WITH DEFAULT KEY.
 
     METHODS is_skipped
@@ -68,6 +78,11 @@ CLASS zcl_eui_logger DEFINITION PUBLIC CREATE PUBLIC.
 ENDCLASS.
 
 CLASS zcl_eui_logger IMPLEMENTATION.
+  METHOD constructor.
+    mv_msg_types = iv_msg_types.
+    mv_unique    = iv_unique.
+  ENDMETHOD.
+
 
   METHOD add.
     DATA ls_msg TYPE bal_s_msg.
@@ -176,7 +191,8 @@ CLASS zcl_eui_logger IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD show_as_button.
-    RETURN. " GUI toolbar button - not available here
+    " GUI toolbar button - not available here
+    ro_logger = me.
   ENDMETHOD.
 
   METHOD clear.

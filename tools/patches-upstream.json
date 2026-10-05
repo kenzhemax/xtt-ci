@@ -1,8 +1,10 @@
 {
   "open-abap-bal/src/ddic/sfb_t_bal_s_msg.ttyp.xml": null,
+  "open-abap-core/src/abap/abap.type.abap": "d3daf00ecdc5d00090d11fb44d4df216c24e7308",
   "open-abap-core/src/compat/ole2_object.tabl.xml": null,
   "open-abap-core/src/compat/zcompat.fugr.lzcompattop.abap": null,
   "open-abap-core/src/compat/zcompat.fugr.saplzcompat.abap": null,
   "open-abap-core/src/compat/zcompat.fugr.trint_split_file_and_path.abap": null,
-  "open-abap-core/src/compat/zcompat.fugr.xml": null
+  "open-abap-core/src/compat/zcompat.fugr.xml": null,
+  "open-abap-core/src/icon.type.abap": "85e7e431a129e1269ee7bd5316607f465ef6d83c"
 }

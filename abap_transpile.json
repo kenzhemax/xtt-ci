@@ -24,7 +24,8 @@
     },
     {
       "folder": "/.downport/libs/xtt",
-      "files": "/src/*.*"
+      "files": "/src/*.*",
+      "unit_tests": true
     }
   ],
   "write_unit_tests": true,

@@ -36,6 +36,16 @@ CLASS zcl_eui_file DEFINITION PUBLIC CREATE PUBLIC.
     METHODS get_full_path
       RETURNING VALUE(rv_full_path) TYPE string.
 
+    " no file dialog here: iv_full_path is required
+    METHODS import_from_file
+      IMPORTING iv_full_path         TYPE string OPTIONAL
+                iv_window_title      TYPE csequence DEFAULT 'Import'
+                iv_default_extension TYPE string OPTIONAL
+                iv_default_filename  TYPE string OPTIONAL
+                iv_file_filter       TYPE string OPTIONAL
+      RETURNING VALUE(ro_file)       TYPE REF TO zcl_eui_file
+      RAISING   zcx_eui_exception.
+
     METHODS open
       RAISING zcx_eui_exception.
 
@@ -92,6 +102,15 @@ CLASS zcl_eui_file IMPLEMENTATION.
 
   METHOD get_full_path.
     rv_full_path = mv_full_path.
+  ENDMETHOD.
+
+  METHOD import_from_file.
+    IF iv_full_path IS INITIAL OR file_exist( iv_full_path ) <> abap_true.
+      zcx_eui_exception=>raise_sys_error( iv_message = |file not found: { iv_full_path }| ).
+    ENDIF.
+    mv_xstring   = zcl_js_fs=>read_file_x( iv_full_path ).
+    mv_full_path = iv_full_path.
+    ro_file = me.
   ENDMETHOD.
 
   METHOD open.

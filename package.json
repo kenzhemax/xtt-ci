@@ -8,7 +8,8 @@
     "deps": "node tools/fetch-deps.mjs",
     "build": "node tools/build.mjs",
     "suite": "node --enable-source-maps tools/run.mjs zr_xtt_suite",
-    "ci": "npm run deps && npm run build && npm run suite"
+    "ci": "npm run deps && npm run build && npm test && npm run suite",
+    "test": "node --enable-source-maps tools/unit.mjs"
   },
   "devDependencies": {
     "@abaplint/cli": "^2.120.68",

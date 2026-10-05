@@ -65,13 +65,18 @@ function loadLibs() {
     const excludes = (lib.exclude_filter ?? []).map((p) => new RegExp(p, "i"));
     // "/src/*.*" means top-level only (no subfolders like xtt's demo/)
     const recursive = String(lib.files ?? "/src/**/*.*").includes("**");
+    // "unit_tests": true -> the lib's own test classes come along and the lib
+    // is registered as a regular object (not a dependency), so the transpiler
+    // writes its tests into output/index.mjs
+    const withTests = lib.unit_tests === true;
     let count = 0;
     for (const full of listFiles(path.join(dir, "src"))) {
       const norm = full.replace(/\\/g, "/");
       if (!recursive && path.dirname(full) !== path.join(dir, "src")) continue;
-      if (norm.endsWith(".clas.testclasses.abap")) continue;
+      if (!withTests && norm.endsWith(".clas.testclasses.abap")) continue;
       if (excludes.some((r) => r.test(norm))) continue;
-      files.push({ filename: path.basename(full), contents: fs.readFileSync(full, "utf8") });
+      files.push({ filename: path.basename(full), contents: fs.readFileSync(full, "utf8"),
+                   asInput: withTests });
       count++;
     }
     console.log(`\t${count} files added from lib`);
@@ -86,7 +91,9 @@ for (const f of inputs) {
   reg.addFile(new abaplint.MemoryFile(f.filename, f.contents));
 }
 for (const l of loadLibs()) {
-  reg.addDependency(new abaplint.MemoryFile(l.filename, l.contents));
+  const file = new abaplint.MemoryFile(l.filename, l.contents);
+  if (l.asInput) reg.addFile(file);
+  else reg.addDependency(file);
 }
 reg.parse();
 

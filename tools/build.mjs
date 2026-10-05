@@ -276,7 +276,7 @@ const DOWNPORT_LIBS = [
   {
     name: "xtt",
     src: join("deps", "xtt", "src"),
-    exclude: /file_grid|file_oaor|file_smw0|zcl_xtt_pdf|013_err_repair|testclasses/i,
+    exclude: /file_grid|file_oaor|file_smw0|zcl_xtt_pdf|013_err_repair/i,
   },
 ];
 
