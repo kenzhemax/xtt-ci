@@ -9,6 +9,11 @@
       "files": "/src/**/*.*"
     },
     {
+      "url": "https://github.com/open-abap/open-abap-deprecated",
+      "folder": "/deps/open-abap-deprecated",
+      "files": "/src/**/*.*"
+    },
+    {
       "url": "https://github.com/open-abap/open-abap-bal",
       "folder": "/deps/open-abap-bal",
       "files": "/src/**/*.*"

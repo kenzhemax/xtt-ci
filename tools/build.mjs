@@ -23,14 +23,6 @@ import { join, dirname, relative } from "node:path";
 const WORK = ".downport";
 const CACHE_FILE = ".buildcache.json";
 const FORCE = process.argv.includes("--force");
-// NO_HOIST=1 switches declaration hoisting off (see hoistDeclarations), to
-// re-check whether the transpiler still needs it. HOIST_VERSION is part of the
-// global fingerprint, so flipping the flag always forces a full rebuild -
-// otherwise an incremental build reuses hoisted output and the re-check passes
-// without testing anything.
-const HOIST = process.env.NO_HOIST !== "1";
-const HOIST_VERSION = HOIST ? "hoist-v5" : "hoist-off"; // TYPE only (LIKE is order-dependent); v3: single-line DATA: chains; v4: only from nested blocks (method-top DATA may follow local TYPES); v5: FIELD-SYMBOLS too
-
 function listFiles(dir) {
   const out = [];
   if (!existsSync(dir)) return out;
@@ -91,8 +83,35 @@ function checkPatchBase() {
   }
 }
 
+// An overlay file deleted from tools/patches must not live on in deps/ (a compat
+// DDIC object that upstream now ships elsewhere would exist twice). deps/ are
+// pristine clones plus the overlay, so whatever git reports there that is not an
+// overlay file is a leftover: drop what we added, restore what we replaced.
+// The scan costs ~0.5 s, so it runs only when the list of overlay files changed.
+const OVERLAY_STATE = ".buildcache-overlays.json";
+
+function dropRemovedOverlays() {
+  const overlay = listFiles(PATCH_ROOT).map((p) => relative(PATCH_ROOT, p).replace(/\\/g, "/")).sort();
+  const state = JSON.stringify(overlay);
+  if (existsSync(OVERLAY_STATE) && readFileSync(OVERLAY_STATE, "utf8") === state) return;
+  const keep = new Set(overlay);
+  for (const lib of readdirSync("deps")) {
+    if (!existsSync(join("deps", lib, ".git"))) continue;
+    const status = execSync(`git -C deps/${lib} status --porcelain --untracked-files=all -- src`).toString();
+    for (const line of status.split("\n").filter(Boolean)) {
+      const path = line.slice(3);
+      if (keep.has(`${lib}/${path}`)) continue;
+      if (line.startsWith("??")) rmSync(join("deps", lib, path));
+      else execSync(`git -C deps/${lib} checkout -- ${path}`);
+      console.log(`[build] overlay dropped: deps/${lib}/${path} back to upstream`);
+    }
+  }
+  writeFileSync(OVERLAY_STATE, state);
+}
+
 function applyDepsPatches() {
   checkPatchBase();
+  dropRemovedOverlays();
   for (const patch of listFiles(PATCH_ROOT)) {
     const target = join("deps", relative(PATCH_ROOT, patch));
     const lib = relative(PATCH_ROOT, patch).split(/[\\/]/)[0];
@@ -147,7 +166,7 @@ function globalFingerprint() {
   const configs = ["abap_transpile.json", "package.json", "tools/build.mjs", "tools/transpile.mjs"]
     .map((f) => (existsSync(f) ? hashFile(f) : "missing"))
     .join("|");
-  return sha1(configs + "|" + HOIST_VERSION + "|" + depsFingerprint());
+  return sha1(configs + "|" + depsFingerprint());
 }
 
 // ---- collect current state ------------------------------------------------
@@ -216,6 +235,11 @@ const downportConfig = {
       files: "/src/**/*.*",
     },
     {
+      url: "https://github.com/open-abap/open-abap-deprecated",
+      folder: "/../deps/open-abap-deprecated",
+      files: "/src/**/*.*",
+    },
+    {
       url: "https://github.com/open-abap/open-abap-bal",
       folder: "/../deps/open-abap-bal",
       files: "/src/**/*.*",
@@ -265,71 +289,13 @@ function libFingerprint(dir) {
   return sha1(parts.join("|"));
 }
 
-// The transpiler scopes DATA declared inside IF/TRY/LOOP blocks to the JS
-// block (ABAP semantics is method scope) -> ReferenceError when used after
-// the block. Hoisting single-line declarations to the top of the method is
-// semantically neutral in ABAP and sidesteps the bug for ported libs.
-// Still present in @abaplint/transpiler 2.13.87: a DATA declared inside an IF
-// and read after it dies with "ReferenceError: lv_inner is not defined"
-// (checked with a minimal program). xtt 3b5a0a9 itself no longer contains the
-// pattern - NO_HOIST=1 passes the suite - so this is a safety net for the next
-// upstream change. HOIST / HOIST_VERSION are defined at the top of the file.
-// FIELD-SYMBOLS are method-scoped in ABAP exactly like DATA and hit the same
-// transpiler bug: zcl_xtt_excel_xml~on_match_found declares <lv_date> inside
-// one CASE branch and reads it in another (and after the CASE), which becomes
-// "ReferenceError: fs_lv_date_ is not defined".
-function hoistDeclarations(dir) {
-  const OPEN  = /^(IF|LOOP|DO|WHILE|TRY|CASE)\b|^DO\.$/;
-  const CLOSE = /^(ENDIF|ENDLOOP|ENDDO|ENDWHILE|ENDTRY|ENDCASE)\b/;
-  for (const f of listFiles(dir)) {
-    if (!f.endsWith(".abap")) continue;
-    const lines = readFileSync(f, "utf8").split(/\r?\n/);
-    const out = [];
-    let methodStart = -1;
-    let hoisted = 0;
-    let depth = 0;
-    for (const line of lines) {
-      const t = line.trim().toUpperCase();
-      if (t.startsWith("METHOD ") || t === "METHOD.") {
-        out.push(line);
-        methodStart = out.length;
-        hoisted = 0;
-        depth = 0;
-        continue;
-      }
-      if (t.startsWith("ENDMETHOD")) {
-        methodStart = -1;
-        out.push(line);
-        continue;
-      }
-      const isPlainData = /^\s*DATA\s+\w+\s+TYPE\s+.*\.\s*(".*)?$/i.test(line);
-      const isChainData = /^\s*DATA:\s*\w+\s+TYPE\s+[^,.]+(\s*,\s*\w+\s+TYPE\s+[^,.]+)*\s*\.\s*(".*)?$/i.test(line);
-      const isPlainFs = /^\s*FIELD-SYMBOLS\s+<\w+>\s+TYPE\s+.*\.\s*(".*)?$/i.test(line);
-      const isChainFs = /^\s*FIELD-SYMBOLS:\s*<\w+>\s+TYPE\s+[^,.]+(\s*,\s*<\w+>\s+TYPE\s+[^,.]+)*\s*\.\s*(".*)?$/i.test(line);
-      // only hoist out of nested blocks; top-level DATA stays in place so it
-      // can follow method-local TYPES declarations (e.g. zcl_xtt_image)
-      if (methodStart >= 0 && depth > 0 && (isPlainData || isChainData || isPlainFs || isChainFs)) {
-        out.splice(methodStart + hoisted, 0, line);
-        hoisted++;
-        continue;
-      }
-      if (methodStart >= 0) {
-        if (OPEN.test(t)) depth++;
-        else if (CLOSE.test(t)) depth = Math.max(0, depth - 1);
-      }
-      out.push(line);
-    }
-    writeFileSync(f, out.join("\n"));
-  }
-}
-
 const libState = existsSync(".buildcache-libs.json")
   ? JSON.parse(readFileSync(".buildcache-libs.json", "utf8"))
   : {};
 
 for (const lib of DOWNPORT_LIBS) {
   const outDir = join(WORK, "libs", lib.name);
-  const print = libFingerprint(lib.src) + "|" + sha1(JSON.stringify(downportConfig)) + "|" + HOIST_VERSION;
+  const print = libFingerprint(lib.src) + "|" + sha1(JSON.stringify(downportConfig));
   if (libState[lib.name] === print && existsSync(join(outDir, "src"))) {
     continue; // up to date
   }
@@ -351,7 +317,6 @@ for (const lib of DOWNPORT_LIBS) {
     (d) => !(d.folder ?? "").endsWith(`/deps/${lib.name}`));
   writeFileSync(join(outDir, "abaplint.json"), JSON.stringify(libConfig, null, 2));
   execSync("npx abaplint abaplint.json --fix", { cwd: outDir, stdio: "inherit" });
-  if (HOIST) hoistDeclarations(join(outDir, "src"));
   libState[lib.name] = print;
 }
 writeFileSync(".buildcache-libs.json", JSON.stringify(libState, null, 1));
