@@ -13,11 +13,13 @@
 //   node tools/unit.mjs ZCL_XTT_COND   only classes whose name contains the filter
 
 import { readFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, resolve, dirname, relative } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
+// output/ of the project that runs the tests (xtt-ci itself, or localABAP,
+// which runs this file from deps/xtt-ci); the known list travels with the script
 const OUT = resolve("output");
-const KNOWN_FILE = "tools/unit-known-failures.json";
+const KNOWN_FILE = relative(".", join(dirname(fileURLToPath(import.meta.url)), "unit-known-failures.json"));
 const filter = (process.argv[2] ?? "").toUpperCase();
 
 const index = readFileSync(join(OUT, "index.mjs"), "utf8");
