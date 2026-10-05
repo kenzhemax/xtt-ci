@@ -9,6 +9,8 @@ import { existsSync, rmSync, mkdirSync } from "node:fs";
 
 const DEPS = [
   { name: "open-abap-core", url: "https://github.com/open-abap/open-abap-core" },
+  // standard objects SAP has not released for ABAP Cloud (core takes released ones only)
+  { name: "open-abap-deprecated", url: "https://github.com/open-abap/open-abap-deprecated" },
   { name: "open-abap-bal", url: "https://github.com/open-abap/open-abap-bal" },
   { name: "xtt", url: process.env.XTT_REPO ?? "https://github.com/bizhuka/xtt", ref: process.env.XTT_REF },
 ];

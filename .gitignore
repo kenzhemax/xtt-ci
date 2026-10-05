@@ -6,4 +6,5 @@ deps/
 .downport/
 .buildcache.json
 .buildcache-libs.json
+.buildcache-overlays.json
 *.log
