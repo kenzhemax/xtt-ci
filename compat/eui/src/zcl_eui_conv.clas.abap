@@ -12,6 +12,12 @@ CLASS zcl_eui_conv DEFINITION PUBLIC FINAL CREATE PUBLIC.
         utf_16le TYPE abap_encoding VALUE '4103',
       END OF mc_encoding.
 
+    CONSTANTS:
+      BEGIN OF mc_json_mode,
+        standard TYPE string VALUE '1-2',
+        safe     TYPE string VALUE '2-1',
+      END OF mc_json_mode.
+
     CLASS-METHODS string_to_xstring
       IMPORTING iv_string          TYPE string
                 iv_encoding        TYPE abap_encoding DEFAULT mc_encoding-utf_8
@@ -61,6 +67,18 @@ CLASS zcl_eui_conv DEFINITION PUBLIC FINAL CREATE PUBLIC.
 
     CLASS-METHODS guid_create
       RETURNING VALUE(rv_guid) TYPE sysuuid_c32.
+
+    " eui builds JSON through a JS engine; here /ui2/cl_json does it
+    CLASS-METHODS to_json
+      IMPORTING im_data        TYPE any
+                iv_pure        TYPE abap_bool DEFAULT abap_false
+      RETURNING VALUE(rv_json) TYPE string.
+
+    CLASS-METHODS from_json
+      IMPORTING iv_json TYPE string
+                iv_mode TYPE string DEFAULT mc_json_mode-standard
+      EXPORTING ex_data TYPE any
+                ev_ok   TYPE abap_bool.
 
     CLASS-METHODS assert_equals
       IMPORTING exp                     TYPE any
@@ -212,6 +230,22 @@ CLASS zcl_eui_conv IMPLEMENTATION.
 
   METHOD guid_create.
     rv_guid = cl_system_uuid=>create_uuid_c32_static( ).
+  ENDMETHOD.
+
+  METHOD to_json.
+    rv_json = /ui2/cl_json=>serialize( data = im_data ).
+  ENDMETHOD.
+
+  METHOD from_json.
+    DATA lo_error TYPE REF TO cx_root.
+    CLEAR: ex_data, ev_ok.
+    TRY.
+        /ui2/cl_json=>deserialize( EXPORTING json = iv_json
+                                   CHANGING  data = ex_data ).
+        ev_ok = abap_true.
+      CATCH cx_root INTO lo_error.
+        ev_ok = abap_false.
+    ENDTRY.
   ENDMETHOD.
 
   METHOD assert_equals.

@@ -29,6 +29,8 @@ jobs:
           XTT_REPO: ${{ github.event.inputs.xtt_repo || 'https://github.com/bizhuka/xtt' }}
           XTT_REF: ${{ github.event.inputs.xtt_ref || '' }}
       - run: npm run build
+      - name: run xtt's own unit tests
+        run: npm test
       - name: run xtt feature suite
         run: |
           npm run suite | tee suite.log

@@ -2,8 +2,16 @@
 
 Runs [bizhuka/xtt](https://github.com/bizhuka/xtt) on the
 [abaplint transpiler](https://github.com/abaplint/transpiler) stack —
-**no SAP system required**. The suite exercises the engine end-to-end on the
-author's own demo templates (`src/demo/*.w3mi.data.*`):
+**no SAP system required**. Two layers of tests:
+
+1. **xtt's own ABAP Unit tests** (`zcl_xtt*.clas.testclasses.abap`, 89 methods:
+   the `;cond=` expression evaluator, formula shifting, HTML/XML output).
+   `npm test` runs every method; a failure does not stop the run.
+   Tests that cannot pass here are listed with the reason in
+   `tools/unit-known-failures.json`; the run fails on any other failure and on
+   a listed test that passes again, so the list never goes stale.
+2. **The feature suite** `zr_xtt_suite`, end-to-end on the author's own demo
+   templates (`src/demo/*.w3mi.data.*`):
 
 | Demo | Feature |
 |---|---|
@@ -19,8 +27,11 @@ author's own demo templates (`src/demo/*.w3mi.data.*`):
 | 030  | two root blocks `{DOC-…}` + `{R-…}`, `R` as a table of roots — one cloned sheet per entry |
 | 030_b | `;merge=X` on a sheet that carries no `<mergeCells>` yet — xtt adds the element through `if_ixml_node~insert_child` (open-abap-core#1243) |
 | 060  | relation tree `{R-T;group=DIR-PAR_DIR}` + the static `PREPARE_TREE` event |
+| 200  | markers in inline-string cells (`t="inlineStr"`, as openpyxl writes them) |
+| 201  | absolute relationship targets (`/xl/worksheets/...`): reported as GAP, not asserted, until upstream handles them (bizhuka/xtt#21) |
 
-One template per test — 12 of the 64 templates in `deps/xtt/src/demo/`.
+One template per test — 12 of the 64 templates in `deps/xtt/src/demo/`
+(200 and 201 patch the 010 template on the fly).
 
 The demo *programs* are still not built. Upstream now ships the demos as
 global classes (`zcl_xtt_demo_NNN`, driven by `zcl_xtt_open_report~web_generate`),
@@ -35,10 +46,10 @@ data instead.
 
 ```
 npm install
-npm run ci          # = deps + build + suite
+npm run ci          # = deps + build + unit tests + suite
 ```
 
-Expected final line: `ALL XTT SUITE TESTS PASSED`.
+Expected: `ALL XTT UNIT TESTS PASSED`, then as the final line `ALL XTT SUITE TESTS PASSED`.
 
 To test a fork/branch of xtt: `XTT_REPO=... XTT_REF=... npm run deps` (CI
 exposes the same via workflow_dispatch inputs).
