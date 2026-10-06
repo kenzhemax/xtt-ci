@@ -1,0 +1,8 @@
+[
+  {"carrid": "AA", "carrname": "American Airlines", "currcode": "USD", "url": ""},
+  {"carrid": "AZ", "carrname": "Alitalia", "currcode": "EUR", "url": ""},
+  {"carrid": "JL", "carrname": "Japan Airlines", "currcode": "JPY", "url": ""},
+  {"carrid": "LH", "carrname": "Lufthansa", "currcode": "EUR", "url": ""},
+  {"carrid": "SQ", "carrname": "Singapore Airlines", "currcode": "SGD", "url": ""},
+  {"carrid": "UA", "carrname": "United Airlines", "currcode": "USD", "url": ""}
+]

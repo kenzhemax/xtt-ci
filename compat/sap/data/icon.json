@@ -1,0 +1,8 @@
+[
+  {"id": "@01@", "name": "ICON_CHECKED", "oleng": 2, "button": "X", "status": "X", "message": "X", "function": "X", "textfield": "X", "locked": "", "internal": "ICON_CHECKED", "s_raw": "R0lGODlhCAAIAIAAAACZAAAAACwAAAAACAAIAAACJQQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgUAOw=="},
+  {"id": "@02@", "name": "ICON_INCOMPLETE", "oleng": 2, "button": "X", "status": "X", "message": "X", "function": "X", "textfield": "X", "locked": "", "internal": "ICON_INCOMPLETE", "s_raw": "R0lGODlhCAAIAIAAAMwAAAAAACwAAAAACAAIAAACJQQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgUAOw=="},
+  {"id": "@08@", "name": "ICON_GREEN_LIGHT", "oleng": 2, "button": "X", "status": "X", "message": "X", "function": "X", "textfield": "X", "locked": "", "internal": "ICON_GREEN_LIGHT", "s_raw": "R0lGODlhCAAIAIAAAADIAAAAACwAAAAACAAIAAACJQQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgUAOw=="},
+  {"id": "@09@", "name": "ICON_YELLOW_LIGHT", "oleng": 2, "button": "X", "status": "X", "message": "X", "function": "X", "textfield": "X", "locked": "", "internal": "ICON_YELLOW_LIGHT", "s_raw": "R0lGODlhCAAIAIAAAObIAAAAACwAAAAACAAIAAACJQQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgUAOw=="},
+  {"id": "@0A@", "name": "ICON_RED_LIGHT", "oleng": 2, "button": "X", "status": "X", "message": "X", "function": "X", "textfield": "X", "locked": "", "internal": "ICON_RED_LIGHT", "s_raw": "R0lGODlhCAAIAIAAANwAAAAAACwAAAAACAAIAAACJQQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgUAOw=="},
+  {"id": "@0Y@", "name": "ICON_CREATE", "oleng": 2, "button": "X", "status": "X", "message": "X", "function": "X", "textfield": "X", "locked": "", "internal": "ICON_CREATE", "s_raw": "R0lGODlhCAAIAIAAAABayAAAACwAAAAACAAIAAACJQQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgUAOw=="}
+]

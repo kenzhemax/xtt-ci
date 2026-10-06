@@ -1,0 +1,5 @@
+[
+  {"pernr": "00000001", "subty": "", "objps": "", "sprps": "", "endda": "99991231", "begda": "20200101", "seqnr": "000", "nachn": "Smith", "vorna": "John", "midnm": "Edward", "gesch": "1", "gbdat": "19800115", "perid": "800115300123", "s_photo": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGNwy1tFEmIY1TCqYfhqAACuaV4QOm+zEgAAAABJRU5ErkJggg=="},
+  {"pernr": "00000002", "subty": "", "objps": "", "sprps": "", "endda": "99991231", "begda": "20200101", "seqnr": "000", "nachn": "Ivanova", "vorna": "Anna", "midnm": "Petrovna", "gesch": "2", "gbdat": "19920630", "perid": "920630400456", "s_photo": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGNYFRVFEmIY1TCqYfhqAABieF4QCz8FaAAAAABJRU5ErkJggg=="},
+  {"pernr": "00000003", "subty": "", "objps": "", "sprps": "", "endda": "99991231", "begda": "20200101", "seqnr": "000", "nachn": "Muller", "vorna": "Karl", "midnm": "", "gesch": "1", "gbdat": "19751103", "perid": "751103300789", "s_photo": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGOImhZFEmIY1TCqYfhqAABwp0oQloEpOwAAAABJRU5ErkJggg=="}
+]
