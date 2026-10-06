@@ -1,0 +1,17 @@
+[
+  {"spras": "E", "land1": "AT", "landx": "Austria", "natio": "Austrian", "landx50": "Austria", "natio50": "Austrian"},
+  {"spras": "E", "land1": "CH", "landx": "Switzerland", "natio": "Swiss", "landx50": "Switzerland", "natio50": "Swiss"},
+  {"spras": "E", "land1": "CN", "landx": "China", "natio": "Chinese", "landx50": "China", "natio50": "Chinese"},
+  {"spras": "E", "land1": "DE", "landx": "Germany", "natio": "German", "landx50": "Germany", "natio50": "German"},
+  {"spras": "E", "land1": "ES", "landx": "Spain", "natio": "Spanish", "landx50": "Spain", "natio50": "Spanish"},
+  {"spras": "E", "land1": "FR", "landx": "France", "natio": "French", "landx50": "France", "natio50": "French"},
+  {"spras": "E", "land1": "GB", "landx": "United Kingdom", "natio": "British", "landx50": "United Kingdom", "natio50": "British"},
+  {"spras": "E", "land1": "IT", "landx": "Italy", "natio": "Italian", "landx50": "Italy", "natio50": "Italian"},
+  {"spras": "E", "land1": "JP", "landx": "Japan", "natio": "Japanese", "landx50": "Japan", "natio50": "Japanese"},
+  {"spras": "E", "land1": "KZ", "landx": "Kazakhstan", "natio": "Kazakh", "landx50": "Kazakhstan", "natio50": "Kazakh"},
+  {"spras": "E", "land1": "NL", "landx": "Netherlands", "natio": "Dutch", "landx50": "Netherlands", "natio50": "Dutch"},
+  {"spras": "E", "land1": "PL", "landx": "Poland", "natio": "Polish", "landx50": "Poland", "natio50": "Polish"},
+  {"spras": "E", "land1": "RU", "landx": "Russian Fed.", "natio": "Russian", "landx50": "Russian Federation", "natio50": "Russian"},
+  {"spras": "E", "land1": "SG", "landx": "Singapore", "natio": "Singaporean", "landx50": "Singapore", "natio50": "Singaporean"},
+  {"spras": "E", "land1": "US", "landx": "USA", "natio": "American", "landx50": "United States of America", "natio50": "American"}
+]

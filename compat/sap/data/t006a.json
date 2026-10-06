@@ -1,0 +1,14 @@
+[
+  {"spras": "E", "msehi": "ST", "mseh3": "PC", "mseh6": "PC", "mseht": "Piece", "msehl": "Piece"},
+  {"spras": "E", "msehi": "KG", "mseh3": "KG", "mseh6": "KG", "mseht": "Kilogram", "msehl": "Kilogram"},
+  {"spras": "E", "msehi": "G", "mseh3": "G", "mseh6": "G", "mseht": "Gram", "msehl": "Gram"},
+  {"spras": "E", "msehi": "M", "mseh3": "M", "mseh6": "M", "mseht": "Meter", "msehl": "Meter"},
+  {"spras": "E", "msehi": "KM", "mseh3": "KM", "mseh6": "KM", "mseht": "Kilometer", "msehl": "Kilometer"},
+  {"spras": "E", "msehi": "L", "mseh3": "L", "mseh6": "L", "mseht": "Liter", "msehl": "Liter"},
+  {"spras": "E", "msehi": "H", "mseh3": "HR", "mseh6": "HR", "mseht": "Hour", "msehl": "Hour"},
+  {"spras": "E", "msehi": "MIN", "mseh3": "MIN", "mseh6": "MIN", "mseht": "Minute", "msehl": "Minute"},
+  {"spras": "E", "msehi": "S", "mseh3": "S", "mseh6": "S", "mseht": "Second", "msehl": "Second"},
+  {"spras": "E", "msehi": "PAL", "mseh3": "PAL", "mseh6": "PAL", "mseht": "Pallet", "msehl": "Pallet"},
+  {"spras": "E", "msehi": "KAR", "mseh3": "CAR", "mseh6": "CAR", "mseht": "Carton", "msehl": "Carton"},
+  {"spras": "E", "msehi": "TAG", "mseh3": "DAY", "mseh6": "DAY", "mseht": "Days", "msehl": "Days"}
+]

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_TABL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD02V>
+    <TABNAME>BAPIBDS01</TABNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <TABCLASS>INTTAB</TABCLASS>
+    <DDTEXT>BDS: business object</DDTEXT>
+   </DD02V>
+   <DD03P_TABLE>
+    <DD03P>
+     <FIELDNAME>CLASSNAME</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000030</LENG>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>CLASSTYPE</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000010</LENG>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>CLIENT</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000003</LENG>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>OBJKEY</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000070</LENG>
+    </DD03P>
+   </DD03P_TABLE>
+  </asx:values>
+ </asx:abap>
+</abapGit>

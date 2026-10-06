@@ -20,6 +20,12 @@ import { Transpiler } from "@abaplint/transpiler";
 
 const config = JSON.parse(fs.readFileSync("abap_transpile.json", "utf8"));
 
+// abapGit keeps the content of an SMW0/MIME object (xtt's templates) beside its
+// XML as <name>.w3mi.data.<ext>. Those are bytes: read and write them as latin1
+// (one code point per byte), the same as transpiler-cli does - utf8 breaks them.
+const isBinary = (filename) => /\.(w3mi|smim)\.data\./i.test(filename);
+const encodingOf = (filename) => (isBinary(filename) ? "latin1" : "utf8");
+
 function listFiles(dir) {
   const out = [];
   if (!fs.existsSync(dir)) return out;
@@ -44,7 +50,7 @@ for (const full of listFiles(config.input_folder)) {
       && fs.readFileSync(original).equals(fs.readFileSync(full))) {
     mapTarget = "../src/" + rel; // untouched by downport -> map to the real source
   }
-  inputs.push({ filename: base, contents: fs.readFileSync(full, "utf8"), mapTarget });
+  inputs.push({ filename: base, contents: fs.readFileSync(full, encodingOf(base)), mapTarget });
 }
 
 // ---- library files -----------------------------------------------------------
@@ -75,7 +81,7 @@ function loadLibs() {
       if (!recursive && path.dirname(full) !== path.join(dir, "src")) continue;
       if (!withTests && norm.endsWith(".clas.testclasses.abap")) continue;
       if (excludes.some((r) => r.test(norm))) continue;
-      files.push({ filename: path.basename(full), contents: fs.readFileSync(full, "utf8"),
+      files.push({ filename: path.basename(full), contents: fs.readFileSync(full, encodingOf(full)),
                    asInput: withTests });
       count++;
     }
@@ -134,7 +140,7 @@ for (const obj of output.objects) {
   if (isProg) {
     contents = `if (!globalThis.abap) await import("./_init.mjs");\n` + contents;
   }
-  fs.writeFileSync(path.join(outDir, obj.filename), contents);
+  fs.writeFileSync(path.join(outDir, obj.filename), contents, encodingOf(obj.filename));
 }
 
 if (config.write_unit_tests === true) {

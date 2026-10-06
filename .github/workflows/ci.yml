@@ -35,3 +35,14 @@ jobs:
         run: |
           npm run suite | tee suite.log
           grep -q "ALL XTT SUITE TESTS PASSED" suite.log
+      - name: merge every xtt demo template (make_all)
+        run: |
+          npm run make_all | tee make_all.log
+          grep -q "ALL XTT DEMO TEMPLATES MERGED" make_all.log
+      - name: upload merged demo files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xtt-demo-results
+          path: output/result/
+          if-no-files-found: ignore

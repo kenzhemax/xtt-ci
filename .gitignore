@@ -1,7 +1,7 @@
 node_modules/
 output/
 build/
-data/
+/data/
 deps/
 .downport/
 .buildcache.json

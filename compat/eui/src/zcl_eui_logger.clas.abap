@@ -17,8 +17,9 @@ CLASS zcl_eui_logger DEFINITION PUBLIC CREATE PUBLIC.
         single_msg TYPE i VALUE 4,
       END OF mc_profile.
 
-    " iv_msg_types/iv_unique are kept for API compatibility: xtt passes them,
-    " this collector keeps every message
+    " iv_unique = abap_true keeps identical messages once, as eui does (xtt
+    " sets it: a missing template is reported once, not by every reader).
+    " iv_msg_types is kept for API compatibility, every type is collected.
     METHODS constructor
       IMPORTING iv_msg_types TYPE string DEFAULT mc_msg_types-all
                 iv_unique    TYPE abap_bool OPTIONAL.
@@ -71,10 +72,16 @@ CLASS zcl_eui_logger DEFINITION PUBLIC CREATE PUBLIC.
     DATA mv_msg_types TYPE string.
     DATA mv_unique    TYPE abap_bool.
     DATA mt_skip     TYPE STANDARD TABLE OF ts_skip WITH DEFAULT KEY.
+    DATA mt_unique   TYPE SORTED TABLE OF bal_s_msg WITH UNIQUE KEY msgty msgid msgno msgv1 msgv2 msgv3 msgv4.
 
     METHODS is_skipped
       IMPORTING is_msg            TYPE bal_s_msg
       RETURNING VALUE(rv_skipped) TYPE abap_bool.
+
+    " not skipped and, with iv_unique, not collected before
+    METHODS keep
+      IMPORTING is_msg         TYPE bal_s_msg
+      RETURNING VALUE(rv_keep) TYPE abap_bool.
 ENDCLASS.
 
 CLASS zcl_eui_logger IMPLEMENTATION.
@@ -106,7 +113,7 @@ CLASS zcl_eui_logger IMPLEMENTATION.
     IF iv_msgty IS NOT INITIAL.
       ls_msg-msgty = iv_msgty.
     ENDIF.
-    IF is_skipped( ls_msg ) = abap_false.
+    IF keep( ls_msg ) = abap_true.
       APPEND ls_msg TO mt_messages.
     ENDIF.
   ENDMETHOD.
@@ -133,7 +140,7 @@ CLASS zcl_eui_logger IMPLEMENTATION.
     IF lv_len > 150.
       ls_msg-msgv4 = lv_text+150.
     ENDIF.
-    IF is_skipped( ls_msg ) = abap_false.
+    IF keep( ls_msg ) = abap_true.
       APPEND ls_msg TO mt_messages.
     ENDIF.
   ENDMETHOD.
@@ -146,7 +153,7 @@ CLASS zcl_eui_logger IMPLEMENTATION.
   METHOD add_batch.
     DATA ls_msg TYPE bal_s_msg.
     LOOP AT it_messages INTO ls_msg.
-      IF is_skipped( ls_msg ) = abap_false.
+      IF keep( ls_msg ) = abap_true.
         APPEND ls_msg TO mt_messages.
       ENDIF.
     ENDLOOP.
@@ -169,6 +176,27 @@ CLASS zcl_eui_logger IMPLEMENTATION.
     READ TABLE mt_skip TRANSPORTING NO FIELDS
       WITH KEY msgid = is_msg-msgid msgno = is_msg-msgno.
     rv_skipped = boolc( sy-subrc = 0 ).
+  ENDMETHOD.
+
+  METHOD keep.
+    DATA ls_unique TYPE bal_s_msg.
+    IF is_skipped( is_msg ) = abap_true.
+      RETURN.
+    ENDIF.
+    IF mv_unique = abap_true.
+      ls_unique-msgty = is_msg-msgty.
+      ls_unique-msgid = is_msg-msgid.
+      ls_unique-msgno = is_msg-msgno.
+      ls_unique-msgv1 = is_msg-msgv1.
+      ls_unique-msgv2 = is_msg-msgv2.
+      ls_unique-msgv3 = is_msg-msgv3.
+      ls_unique-msgv4 = is_msg-msgv4.
+      INSERT ls_unique INTO TABLE mt_unique.
+      IF sy-subrc <> 0.
+        RETURN.
+      ENDIF.
+    ENDIF.
+    rv_keep = abap_true.
   ENDMETHOD.
 
   METHOD has_messages.
@@ -196,7 +224,7 @@ CLASS zcl_eui_logger IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD clear.
-    CLEAR mt_messages.
+    CLEAR: mt_messages, mt_unique.
   ENDMETHOD.
 
 ENDCLASS.

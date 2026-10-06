@@ -28,6 +28,19 @@ CLASS zcl_eui_conv DEFINITION PUBLIC FINAL CREATE PUBLIC.
                 iv_encoding      TYPE abap_encoding DEFAULT mc_encoding-utf_8
       RETURNING VALUE(rv_string) TYPE string.
 
+    " SMW0/BDS content arrives as a table of fixed-width rows; iv_length is
+    " where the content ends (the last row is padded)
+    CLASS-METHODS binary_to_xstring
+      IMPORTING it_table          TYPE STANDARD TABLE
+                iv_length         TYPE i
+      RETURNING VALUE(rv_xstring) TYPE xstring.
+
+    CLASS-METHODS binary_to_string
+      IMPORTING it_table         TYPE STANDARD TABLE
+                iv_length        TYPE i
+                iv_encoding      TYPE abap_encoding DEFAULT mc_encoding-utf_8
+      RETURNING VALUE(rv_string) TYPE string.
+
     CLASS-METHODS string_to_text_table
       IMPORTING iv_string TYPE string
       EXPORTING et_text   TYPE STANDARD TABLE
@@ -104,6 +117,22 @@ CLASS zcl_eui_conv IMPLEMENTATION.
     DATA lo_conv TYPE REF TO cl_abap_conv_in_ce.
     lo_conv = cl_abap_conv_in_ce=>create( input = iv_xstring ).
     lo_conv->read( IMPORTING data = rv_string ).
+  ENDMETHOD.
+
+  METHOD binary_to_xstring.
+    CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+      EXPORTING
+        input_length = iv_length
+      IMPORTING
+        buffer       = rv_xstring
+      TABLES
+        binary_tab   = it_table.
+  ENDMETHOD.
+
+  METHOD binary_to_string.
+    rv_string = xstring_to_string( iv_xstring  = binary_to_xstring( it_table  = it_table
+                                                                    iv_length = iv_length )
+                                   iv_encoding = iv_encoding ).
   ENDMETHOD.
 
   METHOD string_to_text_table.
