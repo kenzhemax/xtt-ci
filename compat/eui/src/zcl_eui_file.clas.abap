@@ -12,6 +12,8 @@ CLASS zcl_eui_file DEFINITION PUBLIC CREATE PUBLIC.
       END OF mc_extension.
 
     DATA mv_xstring TYPE xstring READ-ONLY.
+    " no OLE without SAP GUI: stays unbound (xtt's demo 070 checks it first)
+    DATA mo_ole     TYPE REF TO zif_eui_ole READ-ONLY.
 
     METHODS constructor
       IMPORTING iv_file_name TYPE csequence OPTIONAL
@@ -45,6 +47,10 @@ CLASS zcl_eui_file DEFINITION PUBLIC CREATE PUBLIC.
                 iv_file_filter       TYPE string OPTIONAL
       RETURNING VALUE(ro_file)       TYPE REF TO zcl_eui_file
       RAISING   zcx_eui_exception.
+
+    METHODS import_from_xstring
+      IMPORTING iv_xstring     TYPE xstring
+      RETURNING VALUE(ro_file) TYPE REF TO zcl_eui_file.
 
     METHODS open
       RAISING zcx_eui_exception.
@@ -110,6 +116,11 @@ CLASS zcl_eui_file IMPLEMENTATION.
     ENDIF.
     mv_xstring   = zcl_js_fs=>read_file_x( iv_full_path ).
     mv_full_path = iv_full_path.
+    ro_file = me.
+  ENDMETHOD.
+
+  METHOD import_from_xstring.
+    mv_xstring = iv_xstring.
     ro_file = me.
   ENDMETHOD.
 

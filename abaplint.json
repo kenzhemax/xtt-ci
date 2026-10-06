@@ -23,9 +23,17 @@
       "files": "/src/*.*"
     },
     {
+      "folder": "/compat/sap",
+      "files": "/src/*.*"
+    },
+    {
+      "folder": "/compat/gui",
+      "files": "/src/*.*"
+    },
+    {
       "url": "https://github.com/bizhuka/xtt",
       "folder": "/deps/xtt",
-      "files": "/src/*.*"
+      "files": "/src/**/*.*"
     }
   ],
   "syntax": {

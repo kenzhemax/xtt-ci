@@ -19,6 +19,7 @@ import {
   cpSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync, unlinkSync,
 } from "node:fs";
 import { join, dirname, relative } from "node:path";
+import { patchRuntime } from "./patch-runtime.mjs";
 
 const WORK = ".downport";
 const CACHE_FILE = ".buildcache.json";
@@ -123,6 +124,9 @@ function applyDepsPatches() {
   }
 }
 applyDepsPatches();
+// before the up-to-date check: `npm install` can restore node_modules without
+// touching anything the build cache looks at
+patchRuntime();
 // Anchored fixups: tiny targeted edits to deps sources. Unlike the file
 // overlay above these FAIL LOUDLY when upstream changes the code around the
 // anchor - an upstream update can never be silently reverted.
@@ -163,7 +167,7 @@ function depsFingerprint() {
 function globalFingerprint() {
   // the pipeline itself is part of the fingerprint: changing build/transpile
   // logic must invalidate the cache
-  const configs = ["abap_transpile.json", "package.json", "tools/build.mjs", "tools/transpile.mjs"]
+  const configs = ["abap_transpile.json", "package.json", "tools/build.mjs", "tools/transpile.mjs", "tools/patch-runtime.mjs"]
     .map((f) => (existsSync(f) ? hashFile(f) : "missing"))
     .join("|");
   return sha1(configs + "|" + depsFingerprint());
@@ -249,9 +253,17 @@ const downportConfig = {
       files: "/src/*.*",
     },
     {
+      folder: "/../compat/sap",
+      files: "/src/*.*",
+    },
+    {
+      folder: "/../compat/gui",
+      files: "/src/*.*",
+    },
+    {
       url: "https://github.com/bizhuka/xtt",
       folder: "/../deps/xtt",
-      files: "/src/*.*",
+      files: "/src/**/*.*", // demo/ too: zr_xtt_make_all uses ZCL_XTT_OPEN_REPORT
     },
   ],
   syntax: {
@@ -272,11 +284,16 @@ execSync("npx abaplint abaplint.json --fix", { cwd: WORK, stdio: "inherit" });
 // Their sources go through the same abaplint --fix cycle into .downport/libs/<n>;
 // tools/transpile.mjs then consumes the downported copy instead of deps/<n>.
 // Cached: re-runs only when the lib fingerprint changes.
+// `sub` lists subfolders whose files are copied flat into the lib too: xtt's
+// demo/ holds the demo classes (ZCL_XTT_DEMO_*, ZCL_XTT_OPEN_REPORT->make_all,
+// ZCL_XTT_DEMO_160 used by xtt's own unit tests) and the SMW0 templates
+// (*.w3mi.*). Its Z_XTT_DEMO* reports are SAP GUI screens and stay out.
 const DOWNPORT_LIBS = [
   {
     name: "xtt",
     src: join("deps", "xtt", "src"),
-    exclude: /file_grid|file_oaor|file_smw0|zcl_xtt_pdf|013_err_repair/i,
+    sub: ["demo"],
+    exclude: /file_grid|013_err_repair|[\\/]z_xtt_demo|zxtt_break_point|\.tran\.xml$|package\.devc\.xml$/i,
   },
 ];
 
@@ -302,10 +319,11 @@ for (const lib of DOWNPORT_LIBS) {
   console.log(`[build] step 1b: downport lib ${lib.name}`);
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(join(outDir, "src"), { recursive: true });
+  const dirs = [lib.src, ...(lib.sub ?? []).map((s) => join(lib.src, s))];
   for (const f of listFiles(lib.src)) {
-    if (dirname(f) !== lib.src) continue;          // top level only (skips demo/)
+    if (!dirs.includes(dirname(f))) continue;      // top level + listed subfolders
     if (lib.exclude.test(f)) continue;
-    cpSync(f, join(outDir, "src", relative(lib.src, f)));
+    cpSync(f, join(outDir, "src", relative(dirname(f), f)));
   }
   // same downport config, but dependency paths are one level deeper
   const libConfig = JSON.parse(JSON.stringify(downportConfig));

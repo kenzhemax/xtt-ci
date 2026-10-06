@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_FUGR" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <AREAT>xtt-ci compat: SAP function modules xtt calls</AREAT>
+   <INCLUDES>
+    <SOBJ_NAME>LZSAPCOMPATTOP</SOBJ_NAME>
+    <SOBJ_NAME>SAPLZSAPCOMPAT</SOBJ_NAME>
+   </INCLUDES>
+   <FUNCTIONS>
+    <item>
+     <FUNCNAME>MONTH_NAMES_GET</FUNCNAME>
+     <SHORT_TEXT>Month names from T247</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>LANGUAGE</PARAMETER>
+       <DEFAULT>SY-LANGU</DEFAULT>
+       <OPTIONAL>X</OPTIONAL>
+       <REFERENCE>X</REFERENCE>
+       <TYP>SYLANGU</TYP>
+      </RSIMP>
+     </IMPORT>
+     <EXPORT>
+      <RSEXP>
+       <PARAMETER>RETURN_CODE</PARAMETER>
+       <REFERENCE>X</REFERENCE>
+       <TYP>SYSUBRC</TYP>
+      </RSEXP>
+     </EXPORT>
+     <TABLES>
+      <RSTBL>
+       <PARAMETER>MONTH_NAMES</PARAMETER>
+       <DBSTRUCT>T247</DBSTRUCT>
+      </RSTBL>
+     </TABLES>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>MONTH_NAMES_NOT_FOUND</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+    </item>
+   </FUNCTIONS>
+  </asx:values>
+ </asx:abap>
+</abapGit>

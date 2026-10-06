@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_TABL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD02V>
+    <TABNAME>SDOKFILACI</TABNAME>
+    <DDLANGUAGE>E</DDLANGUAGE>
+    <TABCLASS>INTTAB</TABCLASS>
+    <DDTEXT>SDOK: file access info</DDTEXT>
+   </DD02V>
+   <DD03P_TABLE>
+    <DD03P>
+     <FIELDNAME>FILE_NAME</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000255</LENG>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>FILE_SIZE</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>INT4</DATATYPE>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>BINARY_FLG</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000001</LENG>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>FIRST_LINE</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>INT4</DATATYPE>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>LAST_LINE</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>INT4</DATATYPE>
+    </DD03P>
+    <DD03P>
+     <FIELDNAME>MIMETYPE</FIELDNAME>
+     <ADMINFIELD>0</ADMINFIELD>
+     <DATATYPE>CHAR</DATATYPE>
+     <LENG>000128</LENG>
+    </DD03P>
+   </DD03P_TABLE>
+  </asx:values>
+ </asx:abap>
+</abapGit>

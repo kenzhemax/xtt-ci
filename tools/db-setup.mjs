@@ -16,7 +16,7 @@
 // MIGRATE_DRY_RUN=1 prints the plan without applying (npm run migrate -- --dry-run).
 
 import { SQLiteDatabaseClient } from "@abaplint/database-sqlite";
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -149,6 +149,29 @@ function backupNow() {
   return target;
 }
 
+// ---------- seed rows for SAP's own tables -------------------------------------
+// compat/sap stands in for SAP tables that xtt's tests and demos read (T005X,
+// T247, the flight model, ...). compat/sap/data/<table>.json holds their rows;
+// a table gets them only while it is empty, so rows added or changed later are
+// never touched.
+const SEED_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "compat", "sap", "data");
+const sqlValue = (v) => (typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
+
+async function seedTables(client) {
+  if (!existsSync(SEED_DIR)) return;
+  for (const file of readdirSync(SEED_DIR).filter((f) => f.endsWith(".json")).sort()) {
+    const table = file.replace(/\.json$/, "");
+    if (await actualTable(client, table) === null) continue; // not in the DDIC (any more)
+    const count = await client.select({ select: `SELECT COUNT(*) AS n FROM '${table}'` });
+    if (Number(count.rows[0].n) > 0) continue;
+    for (const row of JSON.parse(readFileSync(join(SEED_DIR, file), "utf8"))) {
+      const cols = Object.keys(row);
+      await client.execute(`INSERT INTO '${table}' (${cols.map((c) => `'${c}'`).join(", ")}) ` +
+                           `VALUES (${cols.map((c) => sqlValue(row[c])).join(", ")})`);
+    }
+  }
+}
+
 // ---------- entry points ----------------------------------------------------------
 export async function connect(abap, schemas, insert) {
   const client = new SQLiteDatabaseClient();
@@ -182,6 +205,9 @@ export async function connect(abap, schemas, insert) {
       backupNow();
       await applyMigration(client, plan);
     }
+  }
+  if (process.env.MIGRATE_DRY_RUN !== "1") {
+    await seedTables(client);
   }
 
   abap.context.databaseConnections["DEFAULT"] = client;

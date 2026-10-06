@@ -23,6 +23,14 @@
       "files": "/src/*.*"
     },
     {
+      "folder": "/compat/sap",
+      "files": "/src/*.*"
+    },
+    {
+      "folder": "/compat/gui",
+      "files": "/src/*.*"
+    },
+    {
       "folder": "/.downport/libs/xtt",
       "files": "/src/*.*",
       "unit_tests": true
