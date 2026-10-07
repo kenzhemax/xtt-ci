@@ -105,9 +105,7 @@ exposes the same via workflow_dispatch inputs).
 
 ## Known gaps
 
-Four unit tests are listed in `tools/unit-known-failures.json`. Two are xtt
-bugs on the `sy-saprl = 'OPEN'` path and fail the same way in
-bizhuka/open-abap-xtt (`DEMO_INVALID_OPERANDS`, `BOOLEAN_RESULTS`). Two are
+Two unit tests are listed in `tools/unit-known-failures.json`, both
 `@abaplint/runtime` gaps with `ASSIGN ... CASTING` to deep types
 (`_GET_STRUCTURE`, `_GET_ONE_LINE_TABLE` of the template maker; the
 open-abap-xtt runner skips methods starting with `_`).
