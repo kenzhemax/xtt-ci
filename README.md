@@ -85,17 +85,18 @@ exposes the same via workflow_dispatch inputs).
   documents, `cl_fp` returns no PDF, so `zcl_xtt_pdf` hands back the XDP), and
   `MONTH_NAMES_GET` (function group `ZSAPCOMPAT`, reads `T247`).
   `compat/sap/data/<table>.json` seeds those tables with invented sample rows
-  when the database is set up, only while a table is empty
+  when the database is set up, only while a table is empty.
+  The `ZIF_XTT~SEND` parameter types `RMPS_RECIPIENT_BCS` and `SO_OBJ_DES`
+  are stubbed too: since transpiler 2.14.0 a class lists its interface
+  aliases, so describing `ZCL_XTT` or a demo class describes `ZIF_XTT~SEND`,
+  and an unknown parameter type fails the whole RTTI call
 - `compat/gui/` holds the ALV pieces the demo base class references
   (`lvc_*` types, `stb_button`, a `cl_gui_alv_grid` with just the
   `user_command` event). localABAP does not use it: it gets the real ones from
   open-abap-gui
 - `tools/patch-runtime.mjs` patches `@abaplint/runtime` in `node_modules`
-  until the fix ships upstream: a `?=` down cast to a *local* class was never
-  checked, so no `CX_SY_MOVE_CAST_ERROR` was raised and the wrong object got
-  through. xtt's `;cond=` evaluator relies on that exception (unit test
-  `DEMO_USER_FORMATS`, demo 130). The build stops if the patched code changes
-  upstream
+  while a fix waits to ship upstream. It is empty now: the last entry, the
+  `?=` down cast to a local class, is in @abaplint/runtime 2.14.0
 - MIME objects (`*.w3mi.data.*`, the demo templates) are copied to `output/`
   byte for byte, so `WWWDATA_IMPORT` from open-abap-core returns the original
   file
