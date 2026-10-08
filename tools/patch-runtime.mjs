@@ -9,33 +9,9 @@
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
-const PATCHES = [
-  {
-    // `lo_var ?= mo_value` with a LOCAL target class was never checked: cast()
-    // looks the class up by its bare name (LCL_NODE_VAR), but local classes are
-    // registered as CLAS-<pool>-<name> / PROG-<prog>-<name>, so the lookup
-    // misses, no CX_SY_MOVE_CAST_ERROR is raised and the wrong object gets
-    // through. xtt's ;cond= evaluator relies on that exception
-    // (lcl_node_user_format, test DEMO_USER_FORMATS; demo 130 in make_all).
-    name: "down cast to a local class",
-    file: "node_modules/@abaplint/runtime/build/src/statements/cast.js",
-    broken: String.raw`        targetClass = abap.Classes["PROG-ZFOOBAR-" + targetName];
-    }
-    if (targetClass?.INTERNAL_TYPE === "CLAS") {`,
-    applied: String.raw`        targetClass = abap.Classes["PROG-ZFOOBAR-" + targetName];
-    }
-    // xtt-ci runtime patch: find a local class via the reference's RTTI name
-    if (targetClass === undefined && typeof target.getRTTIName === "function") {
-        const m = /^\\(CLASS-POOL|PROGRAM)=([^\\]+)\\CLASS=([^\\]+)$/i.exec(target.getRTTIName() ?? "");
-        const local = m ? abap.Classes[(m[1].toUpperCase() === "PROGRAM" ? "PROG-" : "CLAS-") +
-            m[2].toUpperCase() + "-" + m[3].toUpperCase()] : undefined;
-        if (local?.INTERNAL_TYPE === "CLAS") {
-            targetClass = local;
-        }
-    }
-    if (targetClass?.INTERNAL_TYPE === "CLAS") {`,
-  },
-];
+// Empty since @abaplint/runtime 2.14.0 shipped the `?=` local class cast fix
+// (abaplint/transpiler#1974).
+const PATCHES = [];
 
 export function patchRuntime() {
   for (const p of PATCHES) {
