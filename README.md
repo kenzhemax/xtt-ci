@@ -89,7 +89,10 @@ exposes the same via workflow_dispatch inputs).
   The `ZIF_XTT~SEND` parameter types `RMPS_RECIPIENT_BCS` and `SO_OBJ_DES`
   are stubbed too: since transpiler 2.14.0 a class lists its interface
   aliases, so describing `ZCL_XTT` or a demo class describes `ZIF_XTT~SEND`,
-  and an unknown parameter type fails the whole RTTI call
+  and an unknown parameter type fails the whole RTTI call.
+  open-abap-core ships `ICON` too (`src/icons/`, since 2026-10-23), but as a
+  4-field structure; demo 100 selects icons with their images (`S_RAW`) from
+  the database, so `abap_transpile.json` excludes core's `icon.tabl.xml`
 - `compat/gui/` holds the ALV pieces the demo base class references
   (`lvc_*` types, `stb_button`, a `cl_gui_alv_grid` with just the
   `user_command` event). localABAP does not use it: it gets the real ones from

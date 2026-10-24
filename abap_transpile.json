@@ -6,7 +6,8 @@
     {
       "url": "https://github.com/open-abap/open-abap-core",
       "folder": "/deps/open-abap-core",
-      "files": "/src/**/*.*"
+      "files": "/src/**/*.*",
+      "exclude_filter": ["/src/icons/icon\\.tabl\\.xml$"]
     },
     {
       "url": "https://github.com/open-abap/open-abap-deprecated",
