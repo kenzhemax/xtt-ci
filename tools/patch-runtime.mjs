@@ -9,9 +9,23 @@
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
-// Empty since @abaplint/runtime 2.14.0 shipped the `?=` local class cast fix
+// Earlier entry: the `?=` local class cast, shipped in 2.14.0
 // (abaplint/transpiler#1974).
-const PATCHES = [];
+const PATCHES = [
+  {
+    // runtime 2.14.11 (abaplint/transpiler#2015) maps [:print:] inside a
+    // bracket to ASCII only, so xtt's control character filter
+    // [^[:print:]\r\n] (zcl_xtt_replace_block) also deletes every non-ASCII
+    // letter: Kazakh and Cyrillic text vanished from docx and html. The same
+    // file maps [^[:print:]] alone to the control characters, and on a Unicode
+    // SAP system [:print:] takes the national letters; this makes print
+    // everything but those control characters.
+    name: "[:print:] keeps non-ASCII characters",
+    file: "node_modules/@abaplint/runtime/build/src/abap_regex.js",
+    broken: String.raw`"print": "\\x20-\\x7E",`,
+    applied: String.raw`"print": "\\x20-\\x7E\\x80-\\uFFFF",`,
+  },
+];
 
 export function patchRuntime() {
   for (const p of PATCHES) {

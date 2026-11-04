@@ -13,12 +13,12 @@
     "test": "node --enable-source-maps tools/unit.mjs"
   },
   "devDependencies": {
-    "@abaplint/cli": "^2.120.80",
-    "@abaplint/core": "^2.120.80",
-    "@abaplint/transpiler": "^2.14.8"
+    "@abaplint/cli": "^2.120.92",
+    "@abaplint/core": "^2.120.92",
+    "@abaplint/transpiler": "^2.14.16"
   },
   "dependencies": {
-    "@abaplint/database-sqlite": "^2.13.83",
-    "@abaplint/runtime": "^2.14.8"
+    "@abaplint/database-sqlite": "^2.14.12",
+    "@abaplint/runtime": "^2.14.16"
   }
 }
